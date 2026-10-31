@@ -9,6 +9,7 @@ $profile=Join-Path $env:APPDATA 'omc-photo-select'
 $uninstallRoot='HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall'
 function Find-Registration { @(Get-ChildItem -LiteralPath $uninstallRoot -ErrorAction SilentlyContinue|ForEach-Object {Get-ItemProperty -LiteralPath $_.PSPath}|Where-Object {$_.DisplayName -like 'OMC*Preview*'}) }
 $report=Join-Path $env:RUNNER_TEMP 'omc-first-install-report.json'
+if([Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString() -ne 'Arm64'){throw 'Approved ARM64 Windows runner required'}
 $result=[ordered]@{status='RUNNING';installerSha256=$InstallerSha256;canonicalInstallExecuted=$false;defaultProfileUsed=$true;bareWindows11Qualified=$false;notes=@('Disposable hosted Windows runner may contain developer tools; app launch PATH excludes them','Silent first-install path, not an automated wizard-click or full native-edit acceptance')}
 function Desktop-Inventory {
   $rows=@(); $shell=$null; $comError=$null
@@ -90,25 +91,57 @@ try {
     }
   } catch {$result.installerBindingLogDiagnosticError=$_.Exception.Message}
   $links=$lateMatches
-  $result.desktopShortcutTargetVerified=($links.Count -gt 0)
+  $result.desktopShortcutInspectionTargetVerified=($links.Count -gt 0)
   $result.matchingDesktopLinks=$links
 
   foreach($name in @('ELECTRON_RUN_AS_NODE','NODE_OPTIONS','NODE_PATH','PYTHONHOME','PYTHONPATH','VIRTUAL_ENV','CONDA_PREFIX')){Remove-Item ('Env:'+ $name) -ErrorAction SilentlyContinue}
   $env:PATH=Join-Path $env:SystemRoot 'System32'
   # No user-data-dir override: exercise the actual first-launch default path.
-  $result.launchMethod='direct-exe-fallback-if-shortcut-invalid'
-  if($links.Count) {
-    try {$app=Start-Process -FilePath $links[0].path -WorkingDirectory $root -PassThru -ErrorAction Stop;$result.launchMethod='installed-desktop-shortcut'}
-    catch {$result.desktopShortcutLaunchError=$_.Exception.Message;$result.launchMethod='direct-exe-fallback-after-shortcut-launch-error';$app=Start-Process -FilePath $exe -WorkingDirectory $root -PassThru}
-  } else {$app=Start-Process -FilePath $exe -WorkingDirectory $root -PassThru}
-  $startup=Join-Path $profile 'startup.log';$deadline=[DateTime]::UtcNow.AddSeconds(45);$ready=$false
+  $result.osArchitecture=[Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString()
+  $result.shellProcessArchitecture=[Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture.ToString()
+  $result.installedExeSha256=(Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash.ToLowerInvariant()
+  if($result.installedExeSha256 -ne '23aa9da7960f8a44b06d8bdb8d5c93a526a8b1ae2712f6e8019a3079a442ac97'){throw 'Unexpected application executable bytes'}
+  $actualLinks=@(
+    foreach($folderKind in @('DesktopDirectory','CommonDesktopDirectory')){
+      $folderPath=[Environment]::GetFolderPath([Enum]::Parse([Environment+SpecialFolder],$folderKind),[Environment+SpecialFolderOption]::DoNotVerify)
+      if($folderPath -and (Test-Path -LiteralPath $folderPath -PathType Container)){
+        Get-ChildItem -LiteralPath $folderPath -Filter 'OMC*Preview.lnk' -File|ForEach-Object {[pscustomobject]@{path=$_.FullName;bytes=$_.Length}}
+      }
+    }
+  )|Sort-Object path -Unique
+  $actualLinks=@($actualLinks)
+  $result.actualProductLinks=$actualLinks
+  if($actualLinks.Count -ne 1){throw 'Exactly one installed OMC desktop shortcut required'}
+  if($actualLinks[0].bytes -le 0 -or $actualLinks[0].bytes -gt 65536){throw 'Installed shortcut size invalid'}
+  $result.shortcutRawBase64=[Convert]::ToBase64String([IO.File]::ReadAllBytes($actualLinks[0].path))
+  $result.shortcutSecondParser=@{}
+  try {
+    $sa=New-Object -ComObject Shell.Application
+    $item=$sa.Namespace([IO.Path]::GetDirectoryName($actualLinks[0].path)).ParseName([IO.Path]::GetFileName($actualLinks[0].path))
+    $result.shortcutSecondParser=@{path=$item.GetLink.Path;targetParsingPath=$item.ExtendedProperty('System.Link.TargetParsingPath')}
+  } catch {$result.shortcutSecondParser=@{error=$_.Exception.Message}}
+  $existing=@(Get-CimInstance Win32_Process|Where-Object {$_.ExecutablePath -eq $exe})
+  if($existing.Count){throw 'App already running before shortcut launch; cannot attribute startup to link'}
+  $result.launchMethod='installed-desktop-shortcut'
+  Start-Process -FilePath $actualLinks[0].path -WorkingDirectory $root -ErrorAction Stop
+  $startup=Join-Path $profile 'startup.log';$deadline=[DateTime]::UtcNow.AddSeconds(90);$ready=$false
   while([DateTime]::UtcNow -lt $deadline){
-    $app.Refresh()
-    if($app.HasExited){throw ('Application exited before renderer readiness: '+$app.ExitCode)}
-    if(Test-Path -LiteralPath $startup){$text=Get-Content -LiteralPath $startup -Raw;if($text -match '"event":"renderer-ready"'){$ready=$true;break}}
-    Start-Sleep -Milliseconds 250
+    $mains=@(Get-CimInstance Win32_Process|Where-Object {$_.ExecutablePath -eq $exe -and $_.CommandLine -notmatch '\s--type='})
+    if($mains.Count -gt 1){throw 'Multiple main processes after shortcut launch'}
+    if($mains.Count -eq 1 -and !$app){
+      $app=Get-Process -Id $mains[0].ProcessId -ErrorAction Stop
+      $ownedAppHandle=$app.Handle
+      if(!$ownedAppHandle -or $ownedAppHandle -eq [IntPtr]::Zero){throw 'Cannot retain owned App handle for the exit-code check'}
+      $result.processHandleRetained=$true
+      $result.shortcutStartedExePath=$mains[0].ExecutablePath;$result.shortcutStartedPid=$mains[0].ProcessId
+    }
+    if($app){$app.Refresh();if($app.HasExited){throw 'Shortcut-started application exited before readiness'}}
+    if($app -and (Test-Path -LiteralPath $startup)){$text=Get-Content -LiteralPath $startup -Raw;if($text -match '"event":"renderer-ready"'){$ready=$true;break}}
+    Start-Sleep -Milliseconds 500
   }
-  if(!$ready){throw 'Default first-launch renderer readiness not reached'}
+  if(!$ready){throw 'Actual shortcut did not produce the expected application and renderer'}
+  $result.desktopShortcutLaunchVerified=$true
+  $result.desktopShortcutTargetVerified=($result.shortcutStartedExePath -eq $exe)
   $steadyUntil=[DateTime]::UtcNow.AddSeconds(3)
   while([DateTime]::UtcNow -lt $steadyUntil){
     $app.Refresh()
@@ -118,7 +151,7 @@ try {
   $app.Refresh()
   if($app.HasExited -or $app.MainWindowHandle -eq [IntPtr]::Zero){throw 'Installed application has no surviving main window'}
   $result.rendererReady=$true;$result.steadySeconds=3;$result.status='PASS_SCOPED_CANONICAL_FIRST_INSTALL_AND_DEFAULT_STARTUP'
-  if(!$result.desktopShortcutTargetVerified -or $result.launchMethod -ne 'installed-desktop-shortcut'){throw 'Application desktop shortcut invalid; direct startup evidence retained'}
+  if(!$result.desktopShortcutLaunchVerified -or !$result.desktopShortcutTargetVerified -or $result.launchMethod -ne 'installed-desktop-shortcut'){throw 'Actual installed shortcut startup verification failed'}
 } catch {$result.status='FAIL_FIRST_INSTALL_OR_STARTUP';$result.failure=$_.Exception.Message;$failureToThrow=$_}
 finally {
   try {
@@ -135,7 +168,9 @@ finally {
         $result.normalStopRequestExit=$LASTEXITCODE
         if($LASTEXITCODE -ne 0){throw 'Normal close request failed'}
         if(!$app.WaitForExit(15000)){throw 'Installed application did not exit normally within 15 seconds'}
-        if($app.ExitCode -ne 0){throw ('Installed application quit with error: '+$app.ExitCode)}
+        $observedExitCode=$app.ExitCode;$result.appExitCode=$observedExitCode
+        if($null -eq $observedExitCode){throw 'Installed App exit code unavailable; this is not evidence of success or a crash'}
+        if($observedExitCode -ne 0){throw ('Installed application quit with error: '+$observedExitCode)}
         $normalCloseVerified=$true
       }
       $rootPrefix=$root.TrimEnd([char]92)+'\';$exitDeadline=[DateTime]::UtcNow.AddSeconds(5)
