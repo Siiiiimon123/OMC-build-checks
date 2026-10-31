@@ -6,7 +6,7 @@ assert sys.platform=='darwin' and platform.machine()=='arm64'
 here=pathlib.Path(__file__).resolve().parent;work=pathlib.Path(os.environ['RUNNER_TEMP'])/'omc-mac-update17-upgrade';work.mkdir(mode=0o700)
 reports=work/'private-reports';reports.mkdir(mode=0o700)
 key=os.environ.pop('OMC_PREVIEW15_TRANSPORT_KEY');token=os.environ.pop('GH_TOKEN')
-clean=dict(os.environ);secret={**clean,'OMC_PREVIEW15_TRANSPORT_KEY':key};report={'status':'RUNNING','steps':[],'authorization':'call_a4156b1b23d3426bb6a6821ec7429ac8'}
+clean=dict(os.environ);secret={**clean,'OMC_PREVIEW15_TRANSPORT_KEY':key};report={'status':'RUNNING','steps':[],'authorization':'call_85dfe8f72e2c414e9499bba0c087f94c'}
 def sha(p):
  with pathlib.Path(p).open('rb') as f:return hashlib.file_digest(f,'sha256').hexdigest()
 def save(p,d):pathlib.Path(p).write_text(json.dumps(d,indent=2)+'\n')
@@ -19,7 +19,10 @@ def api(route,data):
  with urllib.request.urlopen(req,timeout=120) as r:return json.load(r)
 status=1
 try:
- with urllib.request.urlopen(os.environ['BUILD_MANIFEST_URL'],timeout=120) as response:manifest=json.load(response)
+ with urllib.request.urlopen(os.environ['BUILD_MANIFEST_URL'],timeout=120) as response:manifest_bytes=response.read()
+ assert hashlib.sha256(manifest_bytes).hexdigest()=='f0005e24abcd91d05b548d598023f9e88b2d0ae141812ef337b32b0679a7ac66'
+ manifest=json.loads(manifest_bytes)
+ assert manifest['runId']=='41192102628' and manifest['version']=='1.0.21-preview.17'
  assert manifest['status']=='PASS_BUILD_PACKAGE_READBACK_INSTALL_AND_NORMAL_ENTRY'
  mf=work/'BUILD_OUTPUTS.json';save(mf,manifest)
  delta=json.loads((here/'DELTA.json').read_bytes());delta['assets'][0]['url']='https://raw.githubusercontent.com/'+REPO+'/'+os.environ['GITHUB_SHA']+'/mac-update17/delta.enc';save(work/'FROZEN_DELTA.json',delta)
@@ -32,6 +35,7 @@ try:
    n=pathlib.PurePosixPath(row.filename);assert not n.is_absolute() and '..' not in n.parts and '\\' not in row.filename and not row.is_dir() and ((row.external_attr>>16)&0o170000)!=0o120000
    p=private.joinpath(*n.parts);p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes(z.read(row))
  final=next(a for a in manifest['assets'] if a['id']=='final')
+ assert final['plaintextSha256']=='6400fe0d915dc0cd68a727772d7e66f9c168ef0d558e706caf40a71e0f9b00cc' and final['plaintextBytes']==1156045943
  run('install-qa-client16',['sudo','/usr/sbin/installer','-pkg',work/'qa-bootstrap16.pkg','-target','/'])
  run('make-generated-fixture',[sys.executable,here/'make_fixture.py',work/'fixture.jpg'])
  run('actual-upgrade-flow',['node',private/'upgrade-acceptance.mjs','/Applications/OMC-Preview.app',work/'fixture.jpg',reports/'UPGRADE.json',final['plaintextSha256']])
