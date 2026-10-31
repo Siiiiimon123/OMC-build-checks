@@ -6,7 +6,7 @@ assert sys.platform=='darwin' and platform.machine()=='arm64'
 here=pathlib.Path(__file__).resolve().parent;work=pathlib.Path(os.environ['RUNNER_TEMP'])/'omc-mac-update17-upgrade';work.mkdir(mode=0o700)
 reports=work/'private-reports';reports.mkdir(mode=0o700)
 key=os.environ.pop('OMC_PREVIEW15_TRANSPORT_KEY');token=os.environ.pop('GH_TOKEN')
-clean=dict(os.environ);secret={**clean,'OMC_PREVIEW15_TRANSPORT_KEY':key};report={'status':'RUNNING','steps':[],'authorization':'call_03916fb670c141bfb0565a0fb676b732'}
+clean=dict(os.environ);secret={**clean,'OMC_PREVIEW15_TRANSPORT_KEY':key};report={'status':'RUNNING','steps':[],'authorization':'call_2a3fe75d5cf549b594192bdba0763fa6'}
 def sha(p):
  with pathlib.Path(p).open('rb') as f:return hashlib.file_digest(f,'sha256').hexdigest()
 def save(p,d):pathlib.Path(p).write_text(json.dumps(d,indent=2)+'\n')

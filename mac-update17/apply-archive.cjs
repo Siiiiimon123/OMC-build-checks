@@ -22,7 +22,11 @@ const sha=b=>crypto.createHash('sha256').update(b).digest('hex');
   if(config.metadataBaseUrl!=='https://omc.xiaoa.cyou/updates/metadata/'||config.targetBaseUrl!=='https://omc.xiaoa.cyou/updates/targets/')throw Error('BASE_UPDATE_ENDPOINT_CHANGED');
   config.metadataBaseUrl='https://omc.xiaoa.cyou/updates/qa/metadata/';config.targetBaseUrl='https://omc.xiaoa.cyou/updates/qa/targets/';fs.writeFileSync(c,JSON.stringify(config,null,2));
  }
- const next=path.join(work,'next-'+mode+'.asar');await asar.createPackageWithOptions(root,next,unpacked.length?{unpack:unpacked.length===1?unpacked[0]:'{'+unpacked.join(',')+'}'}:{});
+ // asar 3.4.1 matches unpack against absolute filenames, not the relative
+ // archive member path. Preserve the original unpacked native members.
+ const patterns=unpacked.map(n=>'**/'+n);
+ const next=path.join(work,'next-'+mode+'.asar');await asar.createPackageWithOptions(root,next,patterns.length?{unpack:patterns.length===1?patterns[0]:'{'+patterns.join(',')+'}'}:{});
+ for(const n of unpacked)if(asar.statFile(next,n,false).unpacked!==true)throw Error('ARCHIVE_UNPACKED_LAYOUT_CHANGED');
  const members=asar.listPackage(next);for(const name of members){const n=name.replace(/^[/\\]/,'');const info=asar.statFile(next,n,false);if(!info.files&&!info.link)asar.extractFile(next,n);}
  const header=asar.getRawHeader(next).headerString;
  fs.renameSync(next,archive);if(fs.existsSync(next+'.unpacked'))fs.cpSync(next+'.unpacked',archive+'.unpacked',{recursive:true});asar.uncache(archive);
