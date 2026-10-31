@@ -1,0 +1,37 @@
+name: Exact installer on Windows ARM desktop
+'on':
+  push:
+    branches: [verify-matebook-arm15]
+    paths: ['Verify-FirstInstall.ps1', 'Probe-AI.ps1', '.github/workflows/matebook-arm-check.yml']
+permissions: {contents: read}
+jobs:
+  arm-compatibility:
+    if: github.repository == 'Siiiiimon123/OMC-build-checks' && github.event.repository.private == false && github.ref == 'refs/heads/verify-matebook-arm15'
+    runs-on: windows-11-arm
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with: {persist-credentials: false, fetch-depth: 1}
+      - name: Download existing exact installer
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $ProgressPreference='SilentlyContinue'
+          Invoke-WebRequest -Uri 'https://omc.xiaoa.cyou/updates/targets/releases/593fb73806821c356c10735424db78a746541b3192f563240295a17b87a20934.OMC-Photo-Select-1.0.21-preview.15-x64.exe' -OutFile (Join-Path $env:RUNNER_TEMP 'OMC-Preview15-Setup.exe') -TimeoutSec 2700
+      - name: Install and actually open the installed desktop shortcut
+        shell: pwsh
+        run: |
+          & ./Verify-FirstInstall.ps1 -Installer (Join-Path $env:RUNNER_TEMP 'OMC-Preview15-Setup.exe') -InstallerSha256 '593fb73806821c356c10735424db78a746541b3192f563240295a17b87a20934' -AppAsarSha256 '2eaf3864ab09b777a25da10c083c3ca90ed4904bbb661143c6e8b85c4054b193'
+      - name: Exercise bundled AI CPU fallback and two generated JPEGs
+        if: always()
+        shell: pwsh
+        run: '& ./Probe-AI.ps1'
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        if: always()
+        with:
+          name: Windows-ARM-exact-installer-result
+          path: |
+            ${{ runner.temp }}/omc-first-install-report.json
+            ${{ runner.temp }}/omc-arm-backend-report.json
+          retention-days: 1
+          if-no-files-found: warn
