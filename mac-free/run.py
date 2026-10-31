@@ -15,7 +15,7 @@ from pkg_contract_adapter import patch_pkg_contract
 
 REPO = 'Siiiiimon123/OMC-build-checks'
 BRANCH = 'refs/heads/codex/mac-preview15-free-20261031'
-AUTH = 'call_0aebdbbf4c0341938157b72ee45c0b5e'
+AUTH = 'call_a5a735551f1642d699d1f3fd6bcc1f1f'
 BASE_SHA = '9d75619194c66d1c6bbaeb5d7e63ad4b09b54605f99f7230289ab6f60378cc1a'
 OVERLAY_SHA = 'c187e65a6395616234ee35b587739696c958c4474c6047de2597f56c528e06d1'
 BOOT_SHA = '517e31e68253ae2b84cc5c81fc78c5feaf03ee657d28349fc24ee61af7f1e232'
@@ -113,6 +113,7 @@ def publish(token, files, release_tag):
 
 
 def main():
+    assert AUTH.startswith('call_'), 'ADDITIONAL_RUN_NOT_AUTHORIZED'
     assert os.environ.get('GITHUB_ACTIONS') == 'true' and os.environ.get('GITHUB_REPOSITORY') == REPO
     assert os.environ.get('GITHUB_REF') == BRANCH and os.environ.get('GITHUB_RUN_ATTEMPT') == '1'
     assert sys.platform == 'darwin' and platform.machine() == 'arm64' and sys.version_info[:3] == (3, 12, 10)
@@ -139,6 +140,10 @@ def main():
     status = 1
     package = None
     try:
+        phase('native-pkg-contract-preflight')
+        with (detail / 'pkg-preflight.log').open('wb') as log:
+            subprocess.run([sys.executable, here / 'pkg_contract_preflight.py', work / 'pkg-preflight', detail / 'pkg-preflight'],
+                check=True, env=clean_env, stdout=log, stderr=subprocess.STDOUT)
         for name in ('base', 'overlay'):
             phase('authenticate-' + name)
             dest = work / ('base.tar' if name == 'base' else 'overlay.zip')

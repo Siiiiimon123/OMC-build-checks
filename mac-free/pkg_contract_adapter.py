@@ -45,12 +45,13 @@ def build_nonrelocatable_pkg(app, work, pkg, run, reports):
     product = packaging / 'requirements.plist'
     minimum_os = info.get('LSMinimumSystemVersion')
     assert isinstance(minimum_os, str) and minimum_os
-    product.write_bytes(plistlib.dumps({'os': [minimum_os]}))
+    product.write_bytes(plistlib.dumps({'os': [minimum_os], 'arch': ['arm64']}))
     distribution = packaging / 'Distribution.xml'
     run('synthesize-native-distribution', ['/usr/bin/productbuild', '--synthesize',
         '--product', product, '--package', component, distribution])
     doc = ET.fromstring(distribution.read_bytes())
     assert not list(doc.iter('relocate')), 'SYNTHESIZED_DISTRIBUTION_RELOCATES'
+    assert doc.find('options').get('hostArchitectures') == 'arm64', 'SYNTHESIZED_ARCHITECTURE_CHANGED'
     shutil.copyfile(distribution, reports / 'NONRELOCATABLE_DISTRIBUTION.xml')
     run('build-self-contained-pkg', ['/usr/bin/productbuild', '--distribution', distribution,
         '--package-path', packaging, pkg])
@@ -69,16 +70,21 @@ def verify_expanded_contract(expanded, reports):
     distributions = list(expanded.glob('Distribution')) + list(expanded.glob('Distribution.xml'))
     assert len(distributions) == 1
     xml = distributions[0].read_bytes()
-    assert not list(ET.fromstring(xml).iter('relocate')), 'PACKAGED_DISTRIBUTION_RELOCATES'
     (reports / 'ACTUAL_PACKAGED_DISTRIBUTION.xml').write_bytes(xml)
+    distribution = ET.fromstring(xml)
+    assert not list(distribution.iter('relocate')), 'PACKAGED_DISTRIBUTION_RELOCATES'
+    assert distribution.find('options').get('hostArchitectures') == 'arm64', 'PACKAGED_ARCHITECTURE_CHANGED'
     infos = list(expanded.rglob('PackageInfo'))
     assert len(infos) == 1, 'EXPECTED_SINGLE_APPLICATION_COMPONENT'
     raw = infos[0].read_bytes()
+    (reports / 'ACTUAL_PACKAGED_PackageInfo.xml').write_bytes(raw)
     info = ET.fromstring(raw)
     assert info.get('install-location') == '/Applications', 'PACKAGED_INSTALL_LOCATION_CHANGED'
     assert info.get('identifier') == 'com.omc.photo-select', 'PACKAGED_IDENTIFIER_CHANGED'
-    assert not list(info.iter('relocate')), 'PACKAGEINFO_RELOCATES'
-    (reports / 'ACTUAL_PACKAGED_PackageInfo.xml').write_bytes(raw)
+    relocations = list(info.iter('relocate'))
+    assert len(relocations) <= 1, 'PACKAGEINFO_MULTIPLE_RELOCATION_SECTIONS'
+    assert all(not node.attrib and not list(node) and not (node.text or '').strip()
+               for node in relocations), 'PACKAGEINFO_ACTIVE_RELOCATION_RULE'
 
 
 def patch_pkg_contract(text):

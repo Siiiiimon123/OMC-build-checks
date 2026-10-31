@@ -10,7 +10,7 @@ jobs:
     if: >-
       github.repository == 'Siiiiimon123/OMC-build-checks' && github.event.repository.private == false && github.ref == 'refs/heads/codex/mac-preview15-free-20261031' && github.run_attempt == 1
     runs-on: macos-15
-    timeout-minutes: 25
+    timeout-minutes: 15
     env:
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
       PYTHONDONTWRITEBYTECODE: '1'
