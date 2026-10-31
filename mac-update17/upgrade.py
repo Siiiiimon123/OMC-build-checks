@@ -22,7 +22,8 @@ try:
  with urllib.request.urlopen(os.environ['BUILD_MANIFEST_URL'],timeout=120) as response:manifest=json.load(response)
  assert manifest['status']=='PASS_BUILD_PACKAGE_READBACK_INSTALL_AND_NORMAL_ENTRY'
  mf=work/'BUILD_OUTPUTS.json';save(mf,manifest)
- for id,source,out in [('qa',mf,work/'qa-bootstrap16.pkg'),('delta',here/'DELTA.json',work/'delta.zip')]:
+ delta=json.loads((here/'DELTA.json').read_bytes());delta['assets'][0]['url']='https://raw.githubusercontent.com/'+REPO+'/'+os.environ['GITHUB_SHA']+'/mac-update17/delta.enc';save(work/'FROZEN_DELTA.json',delta)
+ for id,source,out in [('qa',mf,work/'qa-bootstrap16.pkg'),('delta',work/'FROZEN_DELTA.json',work/'delta.zip')]:
   with (reports/(id+'-transport.log')).open('wb') as log:
    r=subprocess.run(['node',str(here/'transport.cjs'),'fetch','--manifest',str(source),'--id',id,'--output',str(out)],env=secret,stdout=log,stderr=subprocess.STDOUT);assert r.returncode==0
  private=work/'private';private.mkdir()

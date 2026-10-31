@@ -1,4 +1,4 @@
-name: Encrypted Mac update build and real upgrade
+name: Remaining bounded Mac update acceptance
 'on':
   push:
     branches: ['verify-mac-update17']
@@ -6,12 +6,10 @@ name: Encrypted Mac update build and real upgrade
 permissions: {contents: write}
 concurrency: {group: omc-mac-update17-once, cancel-in-progress: false}
 jobs:
-  build:
+  remaining-acceptance:
     if: github.repository == 'Siiiiimon123/OMC-build-checks' && github.event.repository.private == false && github.run_attempt == 1
     runs-on: macos-15
-    timeout-minutes: 30
-    outputs:
-      manifest_url: '${{ steps.native.outputs.manifest_url }}'
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with: {persist-credentials: false, fetch-depth: 1}
@@ -25,25 +23,31 @@ jobs:
         run: |
           set +x
           umask 077
-          python3 mac-update17/build.py
+          python3 - <<'PY'
+          import subprocess,sys
+          subprocess.run([sys.executable,'mac-update17/build.py'],check=True,timeout=1800)
+          PY
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         if: always()
         with: {name: mac-update17-build-result, path: mac-update17/PUBLIC_RESULT.json, retention-days: 1, if-no-files-found: warn}
-  upgrade:
-    needs: build
-    if: github.repository == 'Siiiiimon123/OMC-build-checks' && github.run_attempt == 1 && needs.build.result == 'success'
-    runs-on: macos-15
-    timeout-minutes: 90
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with: {persist-credentials: false, fetch-depth: 1}
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
-        with: {node-version: '24.19.0', architecture: arm64, check-latest: false, package-manager-cache: false}
+      - name: Reclaim authenticated ephemeral build staging
+        run: |
+          python3 - <<'PY'
+          import json,os,pathlib,shutil
+          base=pathlib.Path(os.environ['RUNNER_TEMP']).resolve()
+          stage=base/'omc-mac-update17-build'
+          assert stage.resolve().parent==base and stage.name=='omc-mac-update17-build' and not stage.is_symlink()
+          receipt=json.loads(pathlib.Path('mac-update17/PUBLIC_RESULT.json').read_bytes())
+          assert receipt['status']=='PASS_BUILD_PACKAGE_READBACK_INSTALL_AND_NORMAL_ENTRY'
+          assert {a['id'] for a in receipt['assets']}=={'final','qa','reports'}
+          shutil.rmtree(stage)
+          print('Authenticated outputs retained in encrypted release; owned ephemeral staging reclaimed')
+          PY
       - name: Actual signed QA download and installation
         env:
           OMC_PREVIEW15_TRANSPORT_KEY: '${{ secrets.OMC_PREVIEW15_TRANSPORT_KEY }}'
           GH_TOKEN: '${{ github.token }}'
-          BUILD_MANIFEST_URL: '${{ needs.build.outputs.manifest_url }}'
+          BUILD_MANIFEST_URL: '${{ steps.native.outputs.manifest_url }}'
         run: |
           set +x
           umask 077

@@ -47,7 +47,10 @@ clean={**os.environ,'ELECTRON_SKIP_BINARY_DOWNLOAD':'1','CSC_IDENTITY_AUTO_DISCO
 secret={**clean,'OMC_PREVIEW15_TRANSPORT_KEY':key}
 report={'status':'RUNNING','authorization':AUTH,'steps':[],'modelOrRuntimeRebuilt':False,'sourcePubliclyDisclosed':False}
 try:
- for id,manifest,out in [('pkg',here/'BASE.json',work/'base15.pkg'),('delta',here/'DELTA.json',work/'delta.zip')]:
+ delta=json.loads((here/'DELTA.json').read_bytes())
+ delta['assets'][0]['url']='https://raw.githubusercontent.com/'+REPO+'/'+os.environ['GITHUB_SHA']+'/mac-update17/delta.enc'
+ save(work/'FROZEN_DELTA.json',delta)
+ for id,manifest,out in [('pkg',here/'BASE.json',work/'base15.pkg'),('delta',work/'FROZEN_DELTA.json',work/'delta.zip')]:
   r=subprocess.run(['node',str(here/'transport.cjs'),'fetch','--manifest',str(manifest),'--id',id,'--output',str(out)],env=secret,stdout=(reports/(id+'-transport.log')).open('wb'),stderr=subprocess.STDOUT);assert r.returncode==0
  private=work/'private';private.mkdir()
  with zipfile.ZipFile(work/'delta.zip') as z:
