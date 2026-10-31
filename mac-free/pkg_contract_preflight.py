@@ -5,7 +5,7 @@ from pathlib import Path
 import plistlib
 import subprocess
 import sys
-from pkg_contract_adapter import build_nonrelocatable_pkg, verify_expanded_contract
+from pkg_contract_adapter import build_nonrelocatable_pkg, verify_expanded_contract, normalize_install_permissions
 
 
 def main():
@@ -31,6 +31,7 @@ def main():
             assert result.returncode == 0, label
 
     package = work / 'preflight.pkg'
+    normalize_install_permissions(app, reports / 'PREFLIGHT_PERMISSIONS.json')
     build_nonrelocatable_pkg(app, work, package, run, reports)
     expanded = work / 'expanded'
     run('expand-preflight', ['/usr/sbin/pkgutil', '--expand-full', package, expanded])

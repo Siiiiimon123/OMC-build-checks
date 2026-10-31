@@ -143,7 +143,7 @@ def main():
         phase('native-pkg-contract-preflight')
         with (detail / 'pkg-preflight.log').open('wb') as log:
             subprocess.run([sys.executable, here / 'pkg_contract_preflight.py', work / 'pkg-preflight', detail / 'pkg-preflight'],
-                check=True, env=clean_env, stdout=log, stderr=subprocess.STDOUT)
+                check=True, env=clean_env, stdout=log, stderr=subprocess.STDOUT, umask=0o022)
         for name in ('base', 'overlay'):
             phase('authenticate-' + name)
             dest = work / ('base.tar' if name == 'base' else 'overlay.zip')
@@ -167,7 +167,7 @@ def main():
         with (detail / 'native-bootstrap.log').open('wb') as log:
             result = subprocess.run([sys.executable, bootstrap, '--transport', work / 'base.tar', '--sha256', BASE_SHA,
                 '--work', work / 'build', '--authorization-id', AUTH, '--release-asset-id', '684077774', '--repository', REPO],
-                env=clean_env, stdout=log, stderr=subprocess.STDOUT)
+                env=clean_env, stdout=log, stderr=subprocess.STDOUT, umask=0o022)
         status = result.returncode
         if status == 0:
             result = json.loads((work / 'build/reports/BUILD_RESULT.json').read_bytes())
