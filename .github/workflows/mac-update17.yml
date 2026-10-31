@@ -1,0 +1,53 @@
+name: Encrypted Mac update build and real upgrade
+'on':
+  push:
+    branches: ['verify-mac-update17']
+    paths: ['.github/workflows/mac-update17.yml', 'mac-update17/**']
+permissions: {contents: write}
+concurrency: {group: omc-mac-update17-once, cancel-in-progress: false}
+jobs:
+  build:
+    if: github.repository == 'Siiiiimon123/OMC-build-checks' && github.event.repository.private == false && github.run_attempt == 1
+    runs-on: macos-15
+    timeout-minutes: 30
+    outputs:
+      manifest_url: '${{ steps.native.outputs.manifest_url }}'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with: {persist-credentials: false, fetch-depth: 1}
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with: {node-version: '24.19.0', architecture: arm64, check-latest: false, package-manager-cache: false}
+      - name: Native build and installed package checks
+        id: native
+        env:
+          OMC_PREVIEW15_TRANSPORT_KEY: '${{ secrets.OMC_PREVIEW15_TRANSPORT_KEY }}'
+          GH_TOKEN: '${{ github.token }}'
+        run: |
+          set +x
+          umask 077
+          python3 mac-update17/build.py
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        if: always()
+        with: {name: mac-update17-build-result, path: mac-update17/PUBLIC_RESULT.json, retention-days: 1, if-no-files-found: warn}
+  upgrade:
+    needs: build
+    if: github.repository == 'Siiiiimon123/OMC-build-checks' && github.run_attempt == 1 && needs.build.result == 'success'
+    runs-on: macos-15
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with: {persist-credentials: false, fetch-depth: 1}
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with: {node-version: '24.19.0', architecture: arm64, check-latest: false, package-manager-cache: false}
+      - name: Actual signed QA download and installation
+        env:
+          OMC_PREVIEW15_TRANSPORT_KEY: '${{ secrets.OMC_PREVIEW15_TRANSPORT_KEY }}'
+          GH_TOKEN: '${{ github.token }}'
+          BUILD_MANIFEST_URL: '${{ needs.build.outputs.manifest_url }}'
+        run: |
+          set +x
+          umask 077
+          python3 mac-update17/upgrade.py
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        if: always()
+        with: {name: mac-update17-upgrade-result, path: mac-update17/PUBLIC_UPGRADE_RESULT.json, retention-days: 1, if-no-files-found: warn}

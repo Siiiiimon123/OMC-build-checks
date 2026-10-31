@@ -1,0 +1,15 @@
+{
+  "schema": "omc-aes256gcm-build-transport-v1",
+  "assets": [
+    {
+      "id": "delta",
+      "plaintextBytes": 2631139,
+      "plaintextSha256": "35d6d0694ccd0eae072d317787fcb87cae5cfd388c299882c319caaba0d4eee5",
+      "ciphertextBytes": 2631139,
+      "nonceHex": "c0095ee37fc2e0ec2b67c2c0",
+      "ciphertextSha256": "82ef5b45dc08931989e79e5606eefa1db78c769412242533dc9868ca980f71d5",
+      "tagHex": "f791e622cd34bbcc7d33762466bd90d9",
+      "url": "https://raw.githubusercontent.com/Siiiiimon123/OMC-build-checks/verify-mac-update17/mac-update17/delta.enc"
+    }
+  ]
+}
