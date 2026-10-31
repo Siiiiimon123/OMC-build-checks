@@ -10,10 +10,12 @@ import sys
 import tarfile
 import urllib.request
 import zipfile
+from ui_contract_adapter import patch_native_hook
+from pkg_contract_adapter import patch_pkg_contract
 
 REPO = 'Siiiiimon123/OMC-build-checks'
 BRANCH = 'refs/heads/codex/mac-preview15-free-20261031'
-AUTH = 'call_c5dc1306fbb642b5aa3d7ddf45d3a003'
+AUTH = 'call_0aebdbbf4c0341938157b72ee45c0b5e'
 BASE_SHA = '9d75619194c66d1c6bbaeb5d7e63ad4b09b54605f99f7230289ab6f60378cc1a'
 OVERLAY_SHA = 'c187e65a6395616234ee35b587739696c958c4474c6047de2597f56c528e06d1'
 BOOT_SHA = '517e31e68253ae2b84cc5c81fc78c5feaf03ee657d28349fc24ee61af7f1e232'
@@ -54,6 +56,8 @@ def adapt_bootstrap(original):
     extracted = "        source=root/'source';safe=read(root/'metadata/source-manifest.safe.json')"
     assert text.count(extracted) == 1
     text = text.replace(extracted, "        assert transport.parent==work.parent and transport.name=='base.tar' and transport.is_file() and not transport.is_symlink()\n        save(reports/'TRANSPORT_RECLAIM.json',{'sha256':a.sha256,'bytes':transport.stat().st_size,'reason':'authenticated input fully extracted and each recorded file verified; owned ephemeral runner transport only'})\n        transport.unlink()\n" + extracted)
+    text = patch_native_hook(text)
+    text = patch_pkg_contract(text)
     compile(text, '<derived-native-bootstrap>', 'exec')
     return text.encode('utf-8')
 
@@ -129,7 +133,7 @@ def main():
     assert [(a['id'], a['plaintextBytes'], a['plaintextSha256']) for a in frozen['assets']] == [
         ('base', 1061386240, BASE_SHA), ('overlay', 757063, OVERLAY_SHA)]
     secret_env = {**os.environ, 'OMC_PREVIEW15_TRANSPORT_KEY': key}
-    clean_env = dict(os.environ)
+    clean_env = {**os.environ, 'PYTHONPATH': str(here)}
     save(detail / 'PLATFORM.json', {'machine': platform.machine(), 'diskFreeBytes': shutil.disk_usage(work).free,
         'authorization': AUTH, 'repository': REPO, 'sourceTree': SOURCE_TREE, 'originalBaseAssetId': '684077774'})
     status = 1
@@ -150,7 +154,9 @@ def main():
         save(detail / 'ADAPTER.json', {'originSha256': BOOT_SHA, 'derivedSha256': sha(bootstrap),
             'changes': ['approved public repository binding', 'PKG only; no DMG',
                         'reclaim authenticated base.tar after complete verified extraction',
-                        'remove verified transient expanded PKG only'],
+                        'remove verified transient expanded PKG only',
+                        'calibrate external native UI harness to automatic preview/current refresh control',
+                        'native explicit nonrelocatable component plus synthesized distribution'],
             'productSourceChangedByWrapper': False})
         phase('native-build-and-exact-pkg-acceptance')
         with (detail / 'native-bootstrap.log').open('wb') as log:
