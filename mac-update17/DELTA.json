@@ -3,12 +3,12 @@
   "assets": [
     {
       "id": "delta",
-      "plaintextBytes": 2631395,
-      "plaintextSha256": "8d16fc0b44b5ee6db53c9be65ba0ef37d285b8d1e472d4bd57beac66ea6868b4",
-      "ciphertextBytes": 2631395,
-      "nonceHex": "b4425a72c9ffdd3868a66095",
-      "ciphertextSha256": "b20b65a598ea114411710d996e2017df9a8fd3d707b9ef43b2ff247454e05002",
-      "tagHex": "8df86fa33cdac9a611e731801d795228",
+      "plaintextBytes": 2631523,
+      "plaintextSha256": "0da66e65b87d38268513c14327e01c31c977788e71f24d8cd1a0f091a8424a33",
+      "ciphertextBytes": 2631523,
+      "nonceHex": "bb930f3420e439e3a2ce8741",
+      "ciphertextSha256": "ad14192de268224d84dddd647f88290074127fc3f5b020d976a5f26dfd75be43",
+      "tagHex": "da5a2d3a53c8e2070eb67f1001c986c5",
       "url": "https://raw.githubusercontent.com/Siiiiimon123/OMC-build-checks/verify-mac-update17/mac-update17/delta.enc"
     }
   ]

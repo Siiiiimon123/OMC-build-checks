@@ -2,7 +2,7 @@
 import datetime,hashlib,json,os,pathlib,platform,plistlib,shutil,stat,subprocess,sys,tarfile,time,traceback,urllib.request,zipfile
 from pkg_contract_adapter import build_nonrelocatable_pkg, normalize_install_permissions, verify_expanded_contract
 REPO='Siiiiimon123/OMC-build-checks'
-AUTH='call_2a3fe75d5cf549b594192bdba0763fa6'
+AUTH='call_a4156b1b23d3426bb6a6821ec7429ac8'
 def sha(p):
  with pathlib.Path(p).open('rb') as f:return hashlib.file_digest(f,'sha256').hexdigest()
 def save(p,d):pathlib.Path(p).write_text(json.dumps(d,indent=2)+'\n')
