@@ -21,7 +21,14 @@ try {
   $result.canonicalInstallExecuted=$true
   $registration=Find-Registration
   if($registration.Count -ne 1){throw 'Expected exactly one new installation registration'}
-  $root=[IO.Path]::GetFullPath($registration[0].InstallLocation)
+  # electron-builder stores InstallLocation in Software\APP_GUID, separately
+  # from the uninstall registration. Read the exact key identity we discovered.
+  $installGuid=[Guid]::Empty
+  if(![Guid]::TryParse([string]$registration[0].PSChildName,[ref]$installGuid)){throw 'Unexpected installation registration identity'}
+  $installKey=Join-Path 'HKCU:\Software' ([string]$registration[0].PSChildName)
+  $location=(Get-ItemProperty -LiteralPath $installKey -Name InstallLocation).InstallLocation
+  if([string]::IsNullOrWhiteSpace($location)){throw 'Product installation registry path is missing'}
+  $root=[IO.Path]::GetFullPath($location)
   $localPrefix=[IO.Path]::GetFullPath($env:LOCALAPPDATA).TrimEnd([char]92)+'\'
   if(!$root.StartsWith($localPrefix,[StringComparison]::OrdinalIgnoreCase)){throw 'Unexpected installation location'}
   $exe=Join-Path $root 'OMC-Photo-Select.exe';$asar=Join-Path $root 'resources\app.asar'
