@@ -1,0 +1,15 @@
+{
+  "schema": "omc-aes256gcm-build-transport-v1",
+  "assets": [
+    {
+      "id": "final",
+      "plaintextBytes": 2870937,
+      "plaintextSha256": "0ad964afdb803b721b1c9dde961d674bffa6c972b8e741df374f66d08c6d6eba",
+      "ciphertextBytes": 2870937,
+      "nonceHex": "537e0a46079d27c88e53fbef",
+      "ciphertextSha256": "fed0a73af7804088bda43a291ecf65d157ac706f97e95851bf3f25e7e4bdf723",
+      "tagHex": "26b7438cb75213f24a9cae5494e1f099",
+      "url": "https://omc.xiaoa.cyou/updates/build-inputs/fed0a73af7804088bda43a291ecf65d157ac706f97e95851bf3f25e7e4bdf723.mac-final.enc"
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "schema": "omc-aes256gcm-build-transport-v1",
+  "assets": [
+    {
+      "id": "pkg",
+      "plaintextBytes": 1156076139,
+      "plaintextSha256": "c2c7c2eb0a4f647f41c4f066a0b362e564911a1f556b1d7b99288d57f9555dde",
+      "ciphertextBytes": 1156076139,
+      "nonceHex": "f65fe9b50d09832bcb73cb29",
+      "ciphertextSha256": "f174bf1204d1c1f098970d60c4e8c60b5b01ad553d05a6eb8c593b20800b8035",
+      "tagHex": "96dd885b6b7c796e9f59bc779518b008",
+      "url": "https://github.com/Siiiiimon123/OMC-build-checks/releases/download/omc-mac-r1-encrypted-result-41274803807/package.enc"
+    }
+  ]
+}
