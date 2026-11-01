@@ -1,0 +1,19 @@
+{
+  "schema": "omc-aes256gcm-build-transport-v1",
+  "assets": [
+    {
+      "id": "r1-windows",
+      "plaintextBytes": 41093120,
+      "plaintextSha256": "0a6deb7179ff4689c44ed76189f28969962554621d36e0ed360a4c6a4bb72870",
+      "ciphertextBytes": 41093120,
+      "nonceHex": "122ba714cfaf261ad626dde4",
+      "ciphertextSha256": "4e2f9bf42f6d12741523268b240b6c17c146f4e2c8f9508c741590d4332fa3f6",
+      "tagHex": "c66c3bbca290b306e14e5f8ba3ea78aa",
+      "url": "https://omc.xiaoa.cyou/updates/build-inputs/4e2f9bf42f6d12741523268b240b6c17c146f4e2c8f9508c741590d4332fa3f6.windows-r1.enc"
+    }
+  ],
+  "producerExitCode": 0,
+  "sourceManifestSha256": "fac5a3bf93bc162a29dd5d94e19d03a36c0c1423ad7ffe83eef7fa1bd5fdff37",
+  "sourceFiles": 41,
+  "complete": true
+}

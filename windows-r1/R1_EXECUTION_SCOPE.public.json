@@ -1,0 +1,39 @@
+{
+  "schema": "omc-r1-current-task-bounded-execution-v1",
+  "authorizationId": "user-r1-execution-20261101",
+  "repository": "Siiiiimon123/OMC-build-checks",
+  "limits": {
+    "feeUSD": 0,
+    "windowsRuns": 2,
+    "windowsMinutesEach": 60,
+    "macRuns": 2,
+    "macMinutesEach": 90,
+    "standardPublicRunnersOnly": true,
+    "automaticRerun": false,
+    "stopOnFirstSuccess": true
+  },
+  "sourceTreeWindows": "7fd90440ad51eb7abdf3407b6a25f09ca49a8604",
+  "sourceTreeMac": "42a64bd6e221d12cad35f0bd8e7d85ee89237e6a",
+  "backendBuiltFromMacTree": "126976cbb5e25f01bc1763294ba6a75800bc5f99",
+  "executed": {
+    "windows": 0,
+    "mac": 1
+  },
+  "remaining": {
+    "windows": 2,
+    "mac": 1
+  },
+  "privateInputs": {
+    "windowsTarSha256": "0a6deb7179ff4689c44ed76189f28969962554621d36e0ed360a4c6a4bb72870",
+    "macZipSha256": "0ad964afdb803b721b1c9dde961d674bffa6c972b8e741df374f66d08c6d6eba"
+  },
+  "existingBillingAndPrivacySettingsUnchanged": true,
+  "productSourcePublished": false,
+  "photosOrDatabasesUploaded": false,
+  "memberCatalogPromotionBeforeAcceptance": false,
+  "timingDecision": {
+    "kind": "Root execution estimate revised within current user-approved R1 task; not a new user approval tool call",
+    "reason": "Two actual 4MiB memory-only range probes took10.3/10.6sec.45min self-planned controller allowance risks spending entire run on downloading existing848MB baseline.60min standard public runner, no extra runs, no billing/privacy changes, $0, stop when complete.",
+    "at": "2026-11-01T06:22:13.791616+00:00"
+  }
+}
