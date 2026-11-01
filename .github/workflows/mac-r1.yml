@@ -29,4 +29,4 @@ jobs:
         run: |
           set +x
           umask 077
-          python mac-r1/final/run.py --execute --config mac-r1/final/CONFIG.json --config-sha256 1b3f2d085fa5fe9b8973bf64d9c55dfeeebec803e3a0767366a75d640ba3405e
+          python mac-r1/final/run.py --execute --config mac-r1/final/CONFIG.json --config-sha256 7e3960cc2b2e30db5956f2f211431b0d3fc7ec0004f8d3e1effde7b3ad8eb408

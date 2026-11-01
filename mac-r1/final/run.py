@@ -24,7 +24,7 @@ def main():
     if not a.execute:print(json.dumps({'status':'PREPARED_DISABLED_NO_NETWORK_APP_OR_KEY','stages':['parallel released17 download','authenticate native72 PKG+source delta','frontend-only build','new18 install/JPEG DOM/fullAI/normal exit','early encrypted PKG+reports publication','real17->18 installer data preservation','<=15min QA_READY','controlled real update button+target+Installer','final encrypted reports'],'nativeExecutionVerified':False}));return
     assert sys.platform=='darwin' and platform.machine()=='arm64' and os.environ.get('GITHUB_ACTIONS')=='true'
     assert os.environ.get('GITHUB_REPOSITORY')==REPO and os.environ.get('GITHUB_REF')=='refs/heads/verify-mac-r1-18' and os.environ.get('GITHUB_RUN_ATTEMPT')=='1'
-    assert sha(a.config)==a.config_sha256;cfg=json.loads(Path(a.config).read_bytes());assert cfg['executeAuthorized'] is True and cfg['rootReviewedController'] is True and cfg['macRunsUsedBeforeThis']==1 and cfg['maxMacRuns']==2 and cfg['maxSeconds']==5400 and cfg['feeUSD']==0 and cfg['sourceTreeWindows']==WIN and cfg['sourceTreeMac']==MAC and cfg['backendBuiltFromMacTree']==NATIVE
+    assert sha(a.config)==a.config_sha256;cfg=json.loads(Path(a.config).read_bytes());assert cfg['executeAuthorized'] is True and cfg['rootReviewedController'] is True and cfg['macRunsUsedBeforeThis']==2 and cfg['maxMacRuns']==3 and cfg['maxSeconds']==5400 and cfg['feeUSD']==0 and cfg['sourceTreeWindows']==WIN and cfg['sourceTreeMac']==MAC and cfg['backendBuiltFromMacTree']==NATIVE
     here=Path(__file__).resolve().parent;tools=(here/cfg['genericToolsRelative']).resolve();assert tools.is_relative_to(here.parent.parent.resolve())
     route=cfg['qaRoute'];qa=urllib.parse.urlparse(route['qaMetadataPrefix']);assert route['formalMetadataPrefix']=='https://omc.xiaoa.cyou/updates/metadata/' and qa.scheme=='https' and qa.hostname=='omc.xiaoa.cyou' and qa.port in (None,443) and not qa.username and not qa.password and not qa.query and not qa.fragment and re.fullmatch(r'/updates/qa-r1/[A-Za-z0-9_-]{16,96}/',qa.path)
     assert cfg['readyUrl']==route['qaMetadataPrefix']+'QA_READY.json'
@@ -111,7 +111,24 @@ def main():
         manifest=json.loads((final/'SOURCE_MANIFEST_MAC_FINAL.json').read_bytes())
         for row in manifest['records']:
             f=source/row['path'];assert f.stat().st_size==row['bytes'] and sha(f)==row['sha256'];os.chmod(f,int(row['mode'],8)&0o777)
-        run('git-source-init',['git','init','--quiet',source]);run('git-source-stage',['git','add','--force','--all'],cwd=source);tree=subprocess.check_output(['git','write-tree'],cwd=source,text=True).strip();assert tree==MAC;run('git-source-record',['git','-c','user.name=OMC QA','-c','user.email=qa@invalid.local','commit','--quiet','-m','Authenticated exact Mac source'],cwd=source)
+        run('git-source-init',['git','init','--quiet',source])
+        # Record the authenticated byte snapshot exactly. git add would apply
+        # .gitattributes eol filters to three CRLF build inputs.
+        subprocess.run(['git','read-tree','--empty'],cwd=source,env=clean,check=True,timeout=10)
+        index_rows=[]
+        for row in manifest['records']:
+            raw=(source/row['path']).read_bytes()
+            assert len(raw)==row['bytes'] and hashlib.sha256(raw).hexdigest()==row['sha256'],'SOURCE_CHANGED_BEFORE_RAW_GIT'
+            expected_blob=hashlib.sha1(b'blob '+str(len(raw)).encode()+b'\0'+raw).hexdigest()
+            actual_blob=subprocess.check_output(['git','hash-object','--no-filters','-w','--stdin'],input=raw,cwd=source,env=clean,timeout=10).decode('ascii').strip()
+            assert actual_blob==expected_blob,'RAW_GIT_BLOB_MISMATCH'
+            assert '\n' not in row['path'] and '\0' not in row['path']
+            index_rows.append((row['mode']+' '+actual_blob+'\t'+row['path']+'\0').encode('utf-8'))
+        subprocess.run(['git','update-index','-z','--index-info'],input=b''.join(index_rows),cwd=source,env=clean,check=True,timeout=20)
+        tree=subprocess.check_output(['git','write-tree'],cwd=source,env=clean,text=True,timeout=10).strip()
+        report['actualRawSourceTreeMac']=tree;checkpoint()
+        assert tree==MAC,'SOURCE_GIT_TREE_MISMATCH_EXPECTED_'+MAC+'_ACTUAL_'+tree
+        run('git-source-record',['git','-c','user.name=OMC QA','-c','user.email=qa@invalid.local','commit','--quiet','-m','Authenticated exact Mac source'],cwd=source)
         approval=work/'NATIVE_STAGE_APPROVAL.json';save(approval,{'executeAuthorized':True,'frontendSourceTreeMac':MAC,'bindingSha256':cfg['bindingSha256']})
         run('reuse-native-build',[sys.executable,final/'harness/reuse-native-stage.py','--execute','--base-pkg',work/'native72.pkg','--source',source,'--binding',final/'COMPOSITE_BINDING.json','--manifest',final/'SOURCE_MANIFEST_MAC_FINAL.json','--tools',tools,'--work',work/'frontend-stage','--approval',approval],seconds=1500)
         built=json.loads((work/'frontend-stage/reports/COMPOSITE_BUILD_RESULT.json').read_bytes());package=Path(built['package']['path']);assert sha(package)==built['package']['sha256'];report['newPackage']=built['package'];report['newAsarSha256']=built['asarSha256'];checkpoint()
@@ -147,7 +164,7 @@ def main():
         actual=json.loads((reports/'CONTROLLED_TUF_UPGRADE.json').read_bytes());assert actual['status']=='PASS_ACTUAL_SIGNED_DOWNLOAD_OS_HANDOFF_INSTALL_REOPEN_AND_PROJECT_PRESERVATION' and actual['controlledTransportRoute'] is True and actual['formalUrlServingTested'] is False
         assert sha('/Applications/OMC-Preview.app/Contents/Resources/app.asar')==built['asarSha256'];assert not report['forcedCleanup'];report['status']='PASS_NATIVE_BUILD_UI_PAYLOAD_AND_CONTROLLED_TUF_UPGRADE_FORMAL_FEED_NOT_PROMOTED'
     except Exception as error:
-        report['status']='FAIL_OR_HOLD';report['failureCategory']=type(error).__name__;report['failureCode']=str(error).splitlines()[0][:240]
+        report['status']='FAIL_OR_HOLD';report['failureCategory']=type(error).__name__;report['failureCode']=(str(error).splitlines() or [type(error).__name__])[0][:240]
     finally:
         if old_process and old_process.poll() is None:
             try:os.killpg(old_process.pid,signal.SIGTERM);old_process.wait(timeout=5)

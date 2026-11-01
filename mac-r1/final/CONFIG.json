@@ -1,8 +1,8 @@
 {
   "executeAuthorized": true,
   "rootReviewedController": true,
-  "macRunsUsedBeforeThis": 1,
-  "maxMacRuns": 2,
+  "macRunsUsedBeforeThis": 2,
+  "maxMacRuns": 3,
   "maxSeconds": 5400,
   "feeUSD": 0,
   "sourceTreeWindows": "7fd90440ad51eb7abdf3407b6a25f09ca49a8604",
