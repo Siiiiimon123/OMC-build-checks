@@ -10,7 +10,7 @@ jobs:
     if: >-
       github.repository == 'Siiiiimon123/OMC-build-checks' && github.event.repository.private == false && github.ref == 'refs/heads/verify-mac-r1-18' && github.run_attempt == 1
     runs-on: macos-15
-    timeout-minutes: 90
+    timeout-minutes: 60
     env:
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
       PYTHONDONTWRITEBYTECODE: '1'
@@ -25,8 +25,8 @@ jobs:
         env:
           OMC_PREVIEW15_TRANSPORT_KEY: '${{ secrets.OMC_PREVIEW15_TRANSPORT_KEY }}'
           GH_TOKEN: '${{ github.token }}'
-          OMC_MAC_R1_AUTHORIZATION_ID: 'user-r1-execution-20261101'
+          OMC_MAC_R1_AUTHORIZATION_ID: 'user-r1-completion-20261102'
         run: |
           set +x
           umask 077
-          python mac-r1/final/run.py --execute --config mac-r1/final/CONFIG.json --config-sha256 7e3960cc2b2e30db5956f2f211431b0d3fc7ec0004f8d3e1effde7b3ad8eb408
+          python mac-r1/final/run.py --execute --config mac-r1/final/CONFIG.json --config-sha256 0d4d6c0c91f98438b47388c4e68bcd78201c57aa7d0cc46da2af967f6cbf6f37

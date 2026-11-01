@@ -1,24 +1,31 @@
 {
   "executeAuthorized": true,
   "rootReviewedController": true,
-  "macRunsUsedBeforeThis": 2,
-  "maxMacRuns": 3,
-  "maxSeconds": 5400,
+  "macRunsUsedBeforeThis": 3,
+  "maxMacRuns": 5,
+  "maxSeconds": 3600,
   "feeUSD": 0,
   "sourceTreeWindows": "7fd90440ad51eb7abdf3407b6a25f09ca49a8604",
   "sourceTreeMac": "42a64bd6e221d12cad35f0bd8e7d85ee89237e6a",
   "backendBuiltFromMacTree": "126976cbb5e25f01bc1763294ba6a75800bc5f99",
-  "privateZipSha256": "0ad964afdb803b721b1c9dde961d674bffa6c972b8e741df374f66d08c6d6eba",
+  "privateZipSha256": "aadd88a262bf3fc81b4f0a5ec99fe2a8d00fbacac4b5b4fa1e27adde6df3aa93",
   "bindingSha256": "e5079094bc460ecbd4de568ef365015d6d78949201dd24b3c6c9a101a363bfed",
   "genericToolsRelative": "..",
   "transportManifestSha256s": {
     "base": "d48e7b6edfaddbdccbffb1b80abf633cfbfa74e843d8ce5a55c45c5944d11633",
-    "final": "b1db5f73d4d68788122b89e0573150358634cfb27404333d239a8e48f92daf84"
+    "final": "c4d3e637d9a133855bf26a3b686ec11650ade3fd500f4f67aa58200131481986"
   },
   "qaRoute": {
     "formalMetadataPrefix": "https://omc.xiaoa.cyou/updates/metadata/",
     "qaMetadataPrefix": "https://omc.xiaoa.cyou/updates/qa-r1/751f418b0692a13547eefe6765369a2f/"
   },
   "readyUrl": "https://omc.xiaoa.cyou/updates/qa-r1/751f418b0692a13547eefe6765369a2f/QA_READY.json",
-  "released17TransportManifestSha256": "84a307c285c3aa02e20d423f32e3107f372019d20a89a820905057420863f5f1"
+  "released17TransportManifestSha256": "84a307c285c3aa02e20d423f32e3107f372019d20a89a820905057420863f5f1",
+  "completionAuthorizationId": "call_111cc30030174d1abab39266e9dd9b9a",
+  "additionalMacRunsApproved": 2,
+  "additionalMacSecondsCombined": 5400,
+  "additionalMacRunOrdinal": 1,
+  "reservedAdditionalSecondsForManualSecondRun": 1800,
+  "automaticRerun": false,
+  "stopOnSuccess": true
 }
