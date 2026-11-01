@@ -4,7 +4,7 @@ from pathlib import Path,PurePosixPath
 
 REPO='Siiiiimon123/OMC-build-checks'
 SOURCE='7fd90440ad51eb7abdf3407b6a25f09ca49a8604'
-SCOPE_SHA='f3e6c16f24f231700263baaa80ab655b8acc434aa965a82f3fb1db5212d80fb7'
+SCOPE_SHA='3126da41a531a137ff05f56957b889e11cf32b6ecde8257aa4df5fc280076323'
 PLAN_SHA='e2effe55a43cbea0b6d6ffaf4f8f62e557f519711e877b2b6e275f0359461b6f'
 ZIP_SHA='69157f2bc67793f1887ed1a27cf5e4e566a802e708f07e2accbd4b44357b79f7'
 BASE_SHA='9eda59434c38b50085edd041dd9a7b06e2476e6a99cc0e3c3a7c353695f9703d'
@@ -68,14 +68,69 @@ def main():
  assert os.environ.get('RUNNER_OS')=='Windows' and os.environ.get('RUNNER_ARCH')=='X64' and platform.system()=='Windows'
  assert os.environ.get('OMC_R1_AUTHORIZATION_ID')=='user-r1-execution-20261101'
  here=Path(__file__).resolve().parent;assert sha(here/'R1_EXECUTION_SCOPE.public.json')==SCOPE_SHA
- scope=json.loads((here/'R1_EXECUTION_SCOPE.public.json').read_bytes());assert scope['sourceTreeWindows']==SOURCE and scope['limits']['feeUSD']==0 and scope['remaining']['windows']==2
+ scope=json.loads((here/'R1_EXECUTION_SCOPE.public.json').read_bytes());assert scope['sourceTreeWindows']==SOURCE and scope['limits']['feeUSD']==0 and scope['limits']['windowsRuns']==3 and scope['limits']['windowsMinutesEach']==60 and scope['limits']['automaticRerun'] is False and scope['executed']['windows']==2 and scope['remaining']['windows']==1 and scope['windowsSupplementalApproval']['questionItemId']=='call_111cc30030174d1abab39266e9dd9b9a'
  key=os.environ.pop('OMC_PREVIEW15_TRANSPORT_KEY');token=os.environ.pop('GH_TOKEN');assert len(key)==64
  clean=dict(os.environ);secret={**clean,'OMC_PREVIEW15_TRANSPORT_KEY':key}
  temp=Path(os.environ['RUNNER_TEMP']).resolve();work=temp/'omc-r1-controller';assert not work.exists();work.mkdir()
  assert shutil.disk_usage(work).free>12*1024**3
  detail=work/'reports';detail.mkdir();out=work/'encrypted';out.mkdir();helper=here/'transport.cjs';package=None;status=1
  def run(args,name,timeout,cwd=None,env=clean):
-  with (detail/name).open('wb') as log:subprocess.run([str(x) for x in args],cwd=cwd,env=env,stdout=log,stderr=subprocess.STDOUT,timeout=timeout,check=True)
+  started=time.monotonic()
+  with (detail/name).open('wb') as log:
+   proc=subprocess.Popen([str(x) for x in args],cwd=cwd,env=env,stdout=log,stderr=subprocess.STDOUT)
+   try:
+    code=proc.wait(timeout=timeout)
+    if code:raise subprocess.CalledProcessError(code,args)
+   except subprocess.TimeoutExpired:
+    # Diagnostic failures must never bypass cleanup of this launched QA tree.
+    snapshot={'step':name,'pid':proc.pid,'timeoutSeconds':timeout,'elapsedSeconds':round(time.monotonic()-started,3),'artifacts':[],'cleanupScope':'exact launched root plus observed descendants with matching start time','allDescendantsCertified':False};observed=[]
+    try:
+     ps='$rows=@(Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,Name);$ids=[System.Collections.Generic.HashSet[int]]::new();[void]$ids.Add('+str(proc.pid)+');do{$changed=$false;foreach($row in $rows){if($ids.Contains([int]$row.ParentProcessId)){$changed=$ids.Add([int]$row.ProcessId) -or $changed}}}while($changed);$out=@(foreach($row in $rows){if($ids.Contains([int]$row.ProcessId)){try{$p=Get-Process -Id $row.ProcessId -ErrorAction Stop;[pscustomobject]@{pid=[int]$row.ProcessId;parent=[int]$row.ParentProcessId;name=$row.Name;startTicks=$p.StartTime.ToUniversalTime().Ticks.ToString();cpuSeconds=$p.TotalProcessorTime.TotalSeconds}}catch{}}});ConvertTo-Json -InputObject $out -Compress'
+     cp=subprocess.run(['pwsh','-NoProfile','-Command',ps],capture_output=True,timeout=15,env=clean)
+     snapshot['processMetadataExitCode']=cp.returncode
+     if cp.returncode==0:
+      candidate=json.loads(cp.stdout[:65536].decode('utf8'))
+      assert isinstance(candidate,list) and len(candidate)<=128
+      for row in candidate:assert isinstance(row['pid'],int) and row['pid']>0 and isinstance(row['startTicks'],str) and row['startTicks'].isdigit()
+      observed=candidate;snapshot['ownedProcessMetadata']=observed
+     build=temp/'omc-r1-build'
+     for directory in [build,build/'artifacts']:
+      try:
+       if not directory.is_dir():continue
+       for p in sorted(directory.iterdir()):
+        try:
+         if p.is_file() and not p.is_symlink():snapshot['artifacts'].append({'path':str(p.relative_to(build)),'bytes':p.stat().st_size})
+        except OSError:snapshot.setdefault('artifactInspectionErrors',[]).append(str(p.relative_to(build)))
+      except OSError:snapshot.setdefault('artifactDirectoryInspectionErrors',[]).append(str(directory))
+     save(detail/(name+'.timeout.json'),snapshot)
+    except Exception as error:snapshot['diagnosticError']=type(error).__name__
+    finally:
+     try:
+      if proc.poll() is None:
+       try:
+        cp=subprocess.run(['taskkill.exe','/PID',str(proc.pid),'/T','/F'],stdout=log,stderr=subprocess.STDOUT,timeout=15,env=clean);snapshot['ownedTreeTerminationExitCode']=cp.returncode
+       except Exception as error:snapshot['ownedTreeTerminationError']=type(error).__name__
+      else:snapshot['ownedRootExitedBeforeTermination']=True
+      # A root exit does not prove its already-observed children have exited.
+      # Match each observed PID AND creation time before terminating/readback.
+      if observed:
+       literals=','.join("@{pid="+str(r['pid'])+";startTicks='"+r['startTicks']+"'}" for r in observed)
+       cleanup="$expected=@("+literals+");$stopped=@();foreach($r in $expected){try{$p=Get-Process -Id $r.pid -ErrorAction Stop;if($p.StartTime.ToUniversalTime().Ticks.ToString() -ceq $r.startTicks){Stop-Process -InputObject $p -Force -ErrorAction Stop;$stopped+=$r.pid}}catch{}};$end=[DateTime]::UtcNow.AddSeconds(5);do{$remaining=@(foreach($r in $expected){try{$p=Get-Process -Id $r.pid -ErrorAction Stop;if($p.StartTime.ToUniversalTime().Ticks.ToString() -ceq $r.startTicks){$r.pid}}catch{}});if(!$remaining.Count){break};Start-Sleep -Milliseconds 100}while([DateTime]::UtcNow -lt $end);ConvertTo-Json -Compress -InputObject @{stopped=$stopped;remaining=$remaining}"
+       cp=subprocess.run(['pwsh','-NoProfile','-Command',cleanup],capture_output=True,timeout=15,env=clean);snapshot['observedCleanupExitCode']=cp.returncode
+       if cp.returncode==0:snapshot['observedCleanup']=json.loads(cp.stdout[:65536].decode('utf8'))
+     except Exception as error:snapshot['observedCleanupError']=type(error).__name__
+     finally:
+      try:
+       if proc.poll() is None:proc.kill()
+       proc.wait(timeout=10)
+      except Exception as error:snapshot['rootReapError']=type(error).__name__
+      try:save(detail/(name+'.timeout.json'),snapshot)
+      except Exception:pass
+    raise
+   finally:
+    try:save(detail/(name+'.timing.json'),{'step':name,'pid':proc.pid,'exitCode':proc.poll(),'elapsedSeconds':round(time.monotonic()-started,3),'limitSeconds':timeout})
+    except Exception:pass
+
  try:
   phase('authenticated-compact-input')
   archive=work/'input.tar';run(['node',helper,'fetch','--manifest',here/'INPUT.json','--id','r1-windows','--output',archive],'transport.log',180,env=secret)
@@ -104,6 +159,11 @@ def main():
   shutil.copyfile(rr,detail/rr.name);status=0
  except Exception:
   (detail/'FAILURE.txt').write_text(traceback.format_exc(),encoding='utf8');phase('bounded-job-failed')
+ # Preserve bounded diagnostic files even if build exits before its final result.
+ build=temp/'omc-r1-build'
+ for name in ['BUILD_CONFIG.json','BUILD_PROGRESS.jsonl','BUILD_RESULT.json']:
+  p=build/name
+  if p.is_file() and not p.is_symlink() and p.stat().st_size<2*1024**2 and not (detail/name).exists():shutil.copyfile(p,detail/name)
  for name in ['omc-first-install-report.json','CLEAN_NATIVE_AI.json','UPGRADE16_SEED.json','UPGRADE18_RESTORED.json','CLEAN_NATIVE_AI.json.png','UPGRADE16_SEED.json.png','UPGRADE18_RESTORED.json.png','WINDOWS_R1_RESULT.json']:
   p=temp/name
   if p.is_file() and not p.is_symlink():

@@ -4,7 +4,7 @@
   "repository": "Siiiiimon123/OMC-build-checks",
   "limits": {
     "feeUSD": 0,
-    "windowsRuns": 2,
+    "windowsRuns": 3,
     "windowsMinutesEach": 60,
     "macRuns": 2,
     "macMinutesEach": 90,
@@ -16,11 +16,11 @@
   "sourceTreeMac": "42a64bd6e221d12cad35f0bd8e7d85ee89237e6a",
   "backendBuiltFromMacTree": "126976cbb5e25f01bc1763294ba6a75800bc5f99",
   "executed": {
-    "windows": 0,
+    "windows": 2,
     "mac": 1
   },
   "remaining": {
-    "windows": 2,
+    "windows": 1,
     "mac": 1
   },
   "privateInputs": {
@@ -35,5 +35,17 @@
     "kind": "Root execution estimate revised within current user-approved R1 task; not a new user approval tool call",
     "reason": "Two actual 4MiB memory-only range probes took10.3/10.6sec.45min self-planned controller allowance risks spending entire run on downloading existing848MB baseline.60min standard public runner, no extra runs, no billing/privacy changes, $0, stop when complete.",
     "at": "2026-11-01T06:22:13.791616+00:00"
+  },
+  "windowsSupplementalApproval": {
+    "questionItemId": "call_111cc30030174d1abab39266e9dd9b9a",
+    "verbatimAnswer": "允许按此范围完成验收并上线",
+    "additionalRuns": 1,
+    "maximumTotalRuns": 3,
+    "minutesEach": 60,
+    "feeUSD": 0,
+    "automaticRerun": false,
+    "stopOnSuccess": true,
+    "publicTextMaximumBytesCombined": 131072,
+    "serverUpdateOnlyAfterActualAcceptance": true
   }
 }
