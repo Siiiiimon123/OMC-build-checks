@@ -1,11 +1,5 @@
-param([string]$InputsPath=(Join-Path $PSScriptRoot 'PACKAGE_INPUTS.json'),[string]$BuiltCurrentInstaller,[string]$BuiltPreviousInstaller)
+param([string]$InputsPath=(Join-Path $PSScriptRoot 'PACKAGE_INPUTS.json'),[string]$BuiltCurrentInstaller,[string]$BuiltPreviousInstaller,[switch]$OmcHelpersOnly)
 $ErrorActionPreference='Stop'
-if($env:GITHUB_ACTIONS -ne 'true' -or $env:GITHUB_REPOSITORY -ne 'Siiiiimon123/OMC-build-checks' -or $env:GITHUB_REF -ne 'refs/heads/verify-windows-r1-18' -or $env:GITHUB_RUN_ATTEMPT -ne '1' -or [Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString() -ne 'X64'){throw 'Disposable approved x64 CI only; never member PC'}
-$node=(Get-Command node -CommandType Application|Select-Object -First 1).Source
-$inputs=Get-Content -LiteralPath ($InputsPath) -Raw|ConvertFrom-Json
-if($inputs.authorization -ne 'user-r1-execution-20261101' -or $inputs.sourceTree -ne 'cb0aaee04d7a99e4b175e2b8b039a23afec85006' -or $inputs.current.version -ne '1.0.21-preview.18' -or $inputs.previous.sha256 -ne '9eda59434c38b50085edd041dd9a7b06e2476e6a99cc0e3c3a7c353695f9703d'){throw 'New frozen built-source inputs required'}
-$work=Join-Path $env:RUNNER_TEMP 'omc-r1-x64';if(Test-Path -LiteralPath $work){throw 'Fresh owned workspace required'};[void][IO.Directory]::CreateDirectory($work)
-$report=[ordered]@{status='RUNNING';syntheticOnly=$true;memberDataUsed=$false;wizardClicksTested=$false;bareWindowsQualified=$false;newDependenciesInstalledForApp=$false;upgradeViaSignedInAppUpdateTested=$false;cleanupForced=$false}
 function Assert-LocalExact($asset,$file){
   $root=[IO.Path]::GetFullPath($env:RUNNER_TEMP).TrimEnd('\')+'\';$absolute=[IO.Path]::GetFullPath($file)
   if(-not $absolute.StartsWith($root,[StringComparison]::OrdinalIgnoreCase)){throw 'Local installer outside owned RunnerTemp'}
@@ -15,7 +9,7 @@ function Assert-LocalExact($asset,$file){
 
 function DownloadExact($asset,$target){Invoke-WebRequest -Uri $asset.url -OutFile $target -TimeoutSec 900;if((Get-Item -LiteralPath $target).Length -ne $asset.bytes -or (Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash.ToLowerInvariant() -ne $asset.sha256){throw 'Installer download identity mismatch'}}
 function NormalizeDir([string]$p){ if([string]::IsNullOrWhiteSpace($p)){ return $null }; try { return [IO.Path]::GetFullPath($p).TrimEnd([char]92) } catch { return $null } }
-function Registrations { @(Get-ChildItem 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall' -ErrorAction SilentlyContinue|ForEach-Object {Get-ItemProperty -LiteralPath $_.PSPath}|Where-Object {$_.DisplayName -like 'OMC*Preview*'}) }
+function Registrations { return ,[object[]]@(Get-ChildItem 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall' -ErrorAction SilentlyContinue|ForEach-Object {Get-ItemProperty -LiteralPath $_.PSPath}|Where-Object {$_.DisplayName -like 'OMC*Preview*'}) }
 function InstallRoot { $reg=Registrations;if($reg.Count -ne 1){throw 'Exact canonical registration required'};[IO.Path]::GetFullPath((Get-ItemProperty -LiteralPath ('HKCU:\Software\'+$reg[0].PSChildName) -Name InstallLocation).InstallLocation) }
 function WaitInstaller($file,$args){$p=Start-Process -FilePath $file -ArgumentList $args -PassThru -WindowStyle Hidden;if(!$p.WaitForExit(120000)){throw 'Owned installer timeout'};if($p.ExitCode -ne 0){throw ('Installer exit '+$p.ExitCode)}}
 function Get-UninstallResiduals([string]$installRoot){
@@ -56,8 +50,14 @@ function Get-UninstallResiduals([string]$installRoot){
       $hits.Add([ordered]@{hive=$hive; keyPath=$_.PSPath; psChildName=$_.PSChildName; values=$vals}) | Out-Null
     }
   }
-  return @($hits)
+  # Return a plain object[] (never @($genericList)): @($List[object] of OrderedDictionary)
+  # throws 'Argument types do not match' under pwsh on windows-2025 (seventh run 41477624466).
+  # Unary comma prevents Windows PowerShell 5 from unwrapping empty/typed arrays to $null on return.
+  [object[]]$arr = $hits.ToArray()
+  if ($arr.Length -eq 0) { return ,[object[]]@() }
+  return ,$arr
 }
+
 function WaitOwnedUninstall([string]$installRoot){
   $reg=Registrations
   if($reg.Count -ne 1){ throw 'Exact canonical registration required before uninstall' }
@@ -78,8 +78,9 @@ function WaitOwnedUninstall([string]$installRoot){
       ($_.ExecutablePath -and $_.ExecutablePath.StartsWith($env:TEMP,[StringComparison]::OrdinalIgnoreCase) -and $_.Name -like 'Un*.exe')
     )
   } | ForEach-Object { $_.ProcessId })
-  $argList=@()
-  if(-not [string]::IsNullOrWhiteSpace($argLine)){ $argList = $argLine }
+  # Keep ArgumentList as object[] of one string (PS5/pwsh-safe); do not replace @() with a bare string.
+  [object[]]$argList = @()
+  if(-not [string]::IsNullOrWhiteSpace($argLine)){ $argList = [object[]]@([string]$argLine) }
   $p=Start-Process -FilePath $exe -ArgumentList $argList -PassThru -WindowStyle Hidden
   if(-not $p.WaitForExit(120000)){ throw 'Owned uninstall launcher timeout' }
   if($p.ExitCode -ne 0){ throw ('Uninstall launcher exit '+$p.ExitCode) }
@@ -117,7 +118,16 @@ function WaitOwnedUninstall([string]$installRoot){
 }
 function CheckPng($file){Add-Type -AssemblyName System.Drawing;$b=[Drawing.Bitmap]::new($file);try{$colors=[Collections.Generic.HashSet[int]]::new();for($y=0;$y -lt $b.Height;$y+=17){for($x=0;$x -lt $b.Width;$x+=17){[void]$colors.Add($b.GetPixel($x,$y).ToArgb())}};if($colors.Count -lt 8){throw 'Actual renderer screenshot is blank/uniform'};return @{width=$b.Width;height=$b.Height;distinctSampledColors=$colors.Count}}finally{$b.Dispose()}}
 function OpenActualLink($root,$profile,$mode,$out,$expectedVersion,$snapshot){
- $exe=Join-Path $root 'OMC-Photo-Select.exe';$links=@(foreach($kind in @('DesktopDirectory','CommonDesktopDirectory')){$d=[Environment]::GetFolderPath([Enum]::Parse([Environment+SpecialFolder],$kind),[Environment+SpecialFolderOption]::DoNotVerify);if($d -and (Test-Path -LiteralPath $d)){Get-ChildItem -LiteralPath $d -Filter 'OMC*Preview.lnk' -File}})|Sort-Object FullName -Unique
+ $exe=Join-Path $root 'OMC-Photo-Select.exe'
+ # Collect then cast to object[] so 0/1 FileInfo never becomes a scalar under PS5/pwsh.
+ $linkHits = New-Object System.Collections.Generic.List[object]
+ foreach($kind in @('DesktopDirectory','CommonDesktopDirectory')){
+   $d=[Environment]::GetFolderPath([Enum]::Parse([Environment+SpecialFolder],$kind),[Environment+SpecialFolderOption]::DoNotVerify)
+   if($d -and (Test-Path -LiteralPath $d)){
+     Get-ChildItem -LiteralPath $d -Filter 'OMC*Preview.lnk' -File -ErrorAction SilentlyContinue | ForEach-Object { [void]$linkHits.Add($_) }
+   }
+ }
+ $links = [object[]]@($linkHits.ToArray() | Sort-Object FullName -Unique)
  if(@($links).Count -ne 1){throw 'Exactly one genuine product desktop shortcut required'};$link=$links[0].FullName
  & $node (Join-Path $PSScriptRoot 'inspect-installed.mjs') --link-icon $link $exe;if($LASTEXITCODE){throw 'Original installed shortcut icon wrong'}
  & $node (Join-Path $PSScriptRoot 'inspect-installed.mjs') --link-add-args $link ('--remote-debugging-port=0 --remote-debugging-address=127.0.0.1 --user-data-dir='+$profile);if($LASTEXITCODE){throw 'QA transport-only shortcut adaptation failed'}
@@ -129,6 +139,13 @@ function OpenActualLink($root,$profile,$mode,$out,$expectedVersion,$snapshot){
  finally{& "$env:SystemRoot\System32\taskkill.exe" /PID $app.Id|Out-Null;if($LASTEXITCODE -ne 0 -or !$app.WaitForExit(15000) -or $null -eq $app.ExitCode -or $app.ExitCode -ne 0){throw 'Normal owned App exit0 required'};$prefix=$root.TrimEnd([char]92)+'\';$end=[DateTime]::UtcNow.AddSeconds(8);do{$remaining=@(Get-CimInstance Win32_Process|Where-Object {$_.ExecutablePath -and $_.ExecutablePath.StartsWith($prefix,[StringComparison]::OrdinalIgnoreCase)});if(!$remaining.Count){break};Start-Sleep -Milliseconds 250}while([DateTime]::UtcNow -lt $end);if($remaining.Count){throw 'Owned App children remained'};[IO.File]::WriteAllBytes($link,[IO.File]::ReadAllBytes($link+'.qa-original'));Move-Item -LiteralPath ($link+'.qa-original') -Destination (Join-Path $work ('original-link-'+$mode.TrimStart('-')+'.lnk'))}
  return @{actualLink=$link;actualExe=$exe;mainPid=$app.Id;normalExitCode=$app.ExitCode;screenshot=$shot}
 }
+if($OmcHelpersOnly){ return }
+$node=(Get-Command node -CommandType Application|Select-Object -First 1).Source
+$inputs=Get-Content -LiteralPath ($InputsPath) -Raw|ConvertFrom-Json
+if($inputs.authorization -ne 'user-r1-execution-20261101' -or $inputs.sourceTree -ne 'cb0aaee04d7a99e4b175e2b8b039a23afec85006' -or $inputs.current.version -ne '1.0.21-preview.18' -or $inputs.previous.sha256 -ne '9eda59434c38b50085edd041dd9a7b06e2476e6a99cc0e3c3a7c353695f9703d'){throw 'New frozen built-source inputs required'}
+$work=Join-Path $env:RUNNER_TEMP 'omc-r1-x64';if(Test-Path -LiteralPath $work){throw 'Fresh owned workspace required'};[void][IO.Directory]::CreateDirectory($work)
+$report=[ordered]@{status='RUNNING';syntheticOnly=$true;memberDataUsed=$false;wizardClicksTested=$false;bareWindowsQualified=$false;newDependenciesInstalledForApp=$false;upgradeViaSignedInAppUpdateTested=$false;cleanupForced=$false}
+if($env:GITHUB_ACTIONS -ne 'true' -or $env:GITHUB_REPOSITORY -ne 'Siiiiimon123/OMC-build-checks' -or $env:GITHUB_REF -ne 'refs/heads/verify-windows-r1-18' -or $env:GITHUB_RUN_ATTEMPT -ne '1' -or [Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString() -ne 'X64'){throw 'Disposable approved x64 CI only; never member PC'}
 try{
  if((Registrations).Count){throw 'Clean canonical HKCU required'}
  $new=Join-Path $work 'member18.exe';$old=Join-Path $work 'released16.exe';if($BuiltCurrentInstaller){Assert-LocalExact $inputs.current $BuiltCurrentInstaller;$new=$BuiltCurrentInstaller}else{DownloadExact $inputs.current $new};if($BuiltPreviousInstaller){Assert-LocalExact $inputs.previous $BuiltPreviousInstaller;$old=$BuiltPreviousInstaller}else{DownloadExact $inputs.previous $old}
