@@ -4,7 +4,7 @@
   "repository": "Siiiiimon123/OMC-build-checks",
   "limits": {
     "feeUSD": 0,
-    "windowsRuns": 5,
+    "windowsRuns": 6,
     "windowsMinutesEach": 60,
     "macRuns": 2,
     "macMinutesEach": 90,
@@ -12,11 +12,11 @@
     "automaticRerun": false,
     "stopOnFirstSuccess": true
   },
-  "sourceTreeWindows": "d8368a3db1ee89d7f95282e3c75ae6efd3b7cc5e",
+  "sourceTreeWindows": "cb0aaee04d7a99e4b175e2b8b039a23afec85006",
   "sourceTreeMac": "42a64bd6e221d12cad35f0bd8e7d85ee89237e6a",
   "backendBuiltFromMacTree": "126976cbb5e25f01bc1763294ba6a75800bc5f99",
   "executed": {
-    "windows": 4,
+    "windows": 5,
     "mac": 1
   },
   "remaining": {
@@ -24,7 +24,7 @@
     "mac": 1
   },
   "privateInputs": {
-    "windowsTarSha256": "3cd265c16b25198bf27a7e66d16fbb3a6e6fc0f03c85d09ad76c1c05e39440a0",
+    "windowsTarSha256": "f9d4142640375c69ba13a0ed8c44550a83522d7b26abe84b9a0d367a82d00daf",
     "macZipSha256": "a60f2a02b45b5e798016858d617a31c48e9288b2214cedc2ba834645e8a2ea6e"
   },
   "existingBillingAndPrivacySettingsUnchanged": true,
@@ -74,5 +74,22 @@
     "macUntouched": true,
     "mainUntouched": true,
     "note": "windowsRuns raised 4->5 solely under user approval 2026-11-02 15:16 Asia/Shanghai; one remaining Windows slot for fifth run only."
+  },
+  "windowsSixthSupplementalApproval": {
+    "approvedAtAsiaShanghai": "2026-11-02T20:19:00+08:00",
+    "verbatim": "用户已在 2026-11-02 20:19 亲自批准第六次 Windows 验收：只跑 1 次，标准 x64，≤60 分钟，$0，不自动重跑，不碰 Mac 和 main。",
+    "additionalRuns": 1,
+    "maximumTotalRuns": 6,
+    "minutesEach": 60,
+    "feeUSD": 0,
+    "automaticRerun": false,
+    "stopOnSuccess": true,
+    "standardPublicRunnerOnly": true,
+    "macUntouched": true,
+    "mainUntouched": true,
+    "note": "windowsRuns 5->6 under user approval 2026-11-02 20:19 Asia/Shanghai; exactly one sixth Windows cloud acceptance on verify-windows-r1-18; product fe8de64 / tree cb0aaee; cipher cdcbd1e0 published to update server; no Mac/main.",
+    "productCommit": "fe8de6465724436b45c8208db3284c5d2f143a7c",
+    "productTree": "cb0aaee04d7a99e4b175e2b8b039a23afec85006",
+    "cloudDispatchAuthorized": true
   }
 }

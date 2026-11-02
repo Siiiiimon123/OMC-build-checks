@@ -3,10 +3,10 @@ import hashlib,json,os,platform,shutil,subprocess,sys,tarfile,time,traceback,url
 from pathlib import Path,PurePosixPath
 
 REPO='Siiiiimon123/OMC-build-checks'
-SOURCE='d8368a3db1ee89d7f95282e3c75ae6efd3b7cc5e'
-SCOPE_SHA='a5fe452784aca7fa34fd0ebae0b101f02aa2dd6724d05c2d2e28f182b8d7adc7'
-PLAN_SHA='61ffec867be64dab00bb041acea9c4d5bb53a82e35935c12e9604af4330de7da'
-ZIP_SHA='060a1eab02e6a08060692b68048b4908c670e7f3aed1dca39cd12b2aa2912c87'
+SOURCE='cb0aaee04d7a99e4b175e2b8b039a23afec85006'
+SCOPE_SHA='aeb592411b9fe0bd7d7664b60abd711c0b1403781a93e1c6286c8414c4e30b42'
+PLAN_SHA='2c58d5d7c74d4fb4112f31cffe4563ac2e0195a032d8da6a994ad23b75d2c1f1'
+ZIP_SHA='c5799c658e23ce5684416c5f3066a1de2c19795ff30e43c436daa26a5e01dc2d'
 BASE_SHA='9eda59434c38b50085edd041dd9a7b06e2476e6a99cc0e3c3a7c353695f9703d'
 BASE_URL='https://omc.xiaoa.cyou/updates/targets/releases/'+BASE_SHA+'.OMC-Photo-Select-1.0.21-preview.16-x64.exe'
 
@@ -20,8 +20,8 @@ def safe(name):
  return p.parts
 def extract_tar(archive,root):
  with tarfile.open(archive) as t:
-  rows=t.getmembers();assert len(rows)==44 and len({r.name.lower() for r in rows})==len(rows)
-  assert sum(r.size for r in rows)==41094999
+  rows=t.getmembers();assert len(rows)==46 and len({r.name.lower() for r in rows})==len(rows)
+  assert sum(r.size for r in rows)==41131212
   for r in rows:assert r.isfile() and not r.issym() and not r.islnk();safe(r.name)
   root.mkdir()
   for r in rows:
@@ -30,7 +30,7 @@ def extract_tar(archive,root):
 def extract_source(archive,root,expected):
  assert sha(archive)==ZIP_SHA
  with zipfile.ZipFile(archive) as z:
-  rows=z.infolist();assert len(rows)==923 and len({r.filename for r in rows})==923
+  rows=z.infolist();assert len(rows)==931 and len({r.filename for r in rows})==931
   by={r['path']:r for r in expected};assert set(by)=={r.filename for r in rows}
   root.mkdir()
   for r in rows:
@@ -70,7 +70,7 @@ def main():
  # Git Windows checkout may change CRLF; only this frozen JSON text hashes canonical LF.
  # All archive/source/model/artifact SHA checks remain raw byte checks.
  here=Path(__file__).resolve().parent;scope_bytes=(here/'R1_EXECUTION_SCOPE.public.json').read_bytes();assert hashlib.sha256(scope_bytes.replace(b'\r\n',b'\n')).hexdigest()==SCOPE_SHA,'EXECUTION_SCOPE_TEXT_SHA'
- scope=json.loads(scope_bytes);assert scope['sourceTreeWindows']==SOURCE and scope['limits']['feeUSD']==0 and scope['limits']['windowsRuns']==5 and scope['limits']['windowsMinutesEach']==60 and scope['limits']['automaticRerun'] is False and scope['executed']['windows']==4 and scope['remaining']['windows']==1 and scope['windowsEolSupplementalApproval']['questionItemId']=='call_be127aa5d6874d618736fc7d3bd509ca' and scope['windowsFifthSupplementalApproval']['maximumTotalRuns']==5 and scope['windowsFifthSupplementalApproval']['approvedAtAsiaShanghai']=='2026-11-02T15:16:00+08:00'
+ scope=json.loads(scope_bytes);assert scope['sourceTreeWindows']==SOURCE and scope['limits']['feeUSD']==0 and scope['limits']['windowsRuns']==6 and scope['limits']['windowsMinutesEach']==60 and scope['limits']['automaticRerun'] is False and scope['executed']['windows']==5 and scope['remaining']['windows']==1 and scope['windowsEolSupplementalApproval']['questionItemId']=='call_be127aa5d6874d618736fc7d3bd509ca' and scope['windowsFifthSupplementalApproval']['maximumTotalRuns']==5 and scope['windowsSixthSupplementalApproval']['maximumTotalRuns']==6 and scope['windowsSixthSupplementalApproval']['productTree']=='cb0aaee04d7a99e4b175e2b8b039a23afec85006'
  key=os.environ.pop('OMC_PREVIEW15_TRANSPORT_KEY');token=os.environ.pop('GH_TOKEN');assert len(key)==64
  clean=dict(os.environ);secret={**clean,'OMC_PREVIEW15_TRANSPORT_KEY':key}
  temp=Path(os.environ['RUNNER_TEMP']).resolve();work=temp/'omc-r1-controller';assert not work.exists();work.mkdir()
@@ -136,7 +136,7 @@ def main():
  try:
   phase('authenticated-compact-input')
   archive=work/'input.tar';run(['node',helper,'fetch','--manifest',here/'INPUT.json','--id','r1-windows','--output',archive],'transport.log',180,env=secret)
-  assert archive.stat().st_size==41134080 and sha(archive)=='3cd265c16b25198bf27a7e66d16fbb3a6e6fc0f03c85d09ad76c1c05e39440a0'
+  assert archive.stat().st_size==41175040 and sha(archive)=='f9d4142640375c69ba13a0ed8c44550a83522d7b26abe84b9a0d367a82d00daf'
   payload=work/'payload';extract_tar(archive,payload);assert sha(payload/'PLAN.json')==PLAN_SHA
   sm=json.loads((payload/'source-inputs.json').read_bytes());expected=sm['records'] if isinstance(sm,dict) else sm
   extract_source(payload/'source.zip',payload/'source',expected)

@@ -3,17 +3,17 @@
   "assets": [
     {
       "id": "r1-windows",
-      "plaintextBytes": 41134080,
-      "plaintextSha256": "3cd265c16b25198bf27a7e66d16fbb3a6e6fc0f03c85d09ad76c1c05e39440a0",
-      "ciphertextBytes": 41134080,
-      "nonceHex": "a8e2dc3734b944271a5b137d",
-      "ciphertextSha256": "2aad2f59703199d0893a287575dadf2c7cc51fd28b25ffb2fa6a0a393f57dc7d",
-      "tagHex": "cd0e62b5aa1e3a94a9eb838658f20d2a",
-      "url": "https://omc.xiaoa.cyou/updates/build-inputs/2aad2f59703199d0893a287575dadf2c7cc51fd28b25ffb2fa6a0a393f57dc7d.windows-r1.enc"
+      "plaintextBytes": 41175040,
+      "plaintextSha256": "f9d4142640375c69ba13a0ed8c44550a83522d7b26abe84b9a0d367a82d00daf",
+      "ciphertextBytes": 41175040,
+      "nonceHex": "3c9c0e2668cfeb66dd36f1ad",
+      "ciphertextSha256": "cdcbd1e09130b8cdcc9517e2794e93f4beeeb4d39da17dc1e736d2fcdb4e5d94",
+      "tagHex": "9731889a5f9f42f3400fa6f8b9b9f27a",
+      "url": "https://omc.xiaoa.cyou/updates/build-inputs/cdcbd1e09130b8cdcc9517e2794e93f4beeeb4d39da17dc1e736d2fcdb4e5d94.windows-r1.enc"
     }
   ],
   "producerExitCode": 0,
-  "sourceManifestSha256": "3e1ecf4ad5670695802b81814b76fff40252515e077d6faa107a17de1a50d5b5",
-  "sourceFiles": 44,
+  "sourceManifestSha256": "1f747f4be8155fb8de47bc7bce0dd30904fa4c2263daf61310a9512bbb21e028",
+  "sourceFiles": 46,
   "complete": true
 }
