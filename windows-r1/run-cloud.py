@@ -4,7 +4,7 @@ from pathlib import Path,PurePosixPath
 
 REPO='Siiiiimon123/OMC-build-checks'
 SOURCE='cb0aaee04d7a99e4b175e2b8b039a23afec85006'
-SCOPE_SHA='aeb592411b9fe0bd7d7664b60abd711c0b1403781a93e1c6286c8414c4e30b42'
+SCOPE_SHA='17913d0c07ff693024c34ed0a694f573d4a9ecb70101c20f99383c10de61bb6f'
 PLAN_SHA='2c58d5d7c74d4fb4112f31cffe4563ac2e0195a032d8da6a994ad23b75d2c1f1'
 ZIP_SHA='c5799c658e23ce5684416c5f3066a1de2c19795ff30e43c436daa26a5e01dc2d'
 BASE_SHA='9eda59434c38b50085edd041dd9a7b06e2476e6a99cc0e3c3a7c353695f9703d'
@@ -70,7 +70,10 @@ def main():
  # Git Windows checkout may change CRLF; only this frozen JSON text hashes canonical LF.
  # All archive/source/model/artifact SHA checks remain raw byte checks.
  here=Path(__file__).resolve().parent;scope_bytes=(here/'R1_EXECUTION_SCOPE.public.json').read_bytes();assert hashlib.sha256(scope_bytes.replace(b'\r\n',b'\n')).hexdigest()==SCOPE_SHA,'EXECUTION_SCOPE_TEXT_SHA'
- scope=json.loads(scope_bytes);assert scope['sourceTreeWindows']==SOURCE and scope['limits']['feeUSD']==0 and scope['limits']['windowsRuns']==6 and scope['limits']['windowsMinutesEach']==60 and scope['limits']['automaticRerun'] is False and scope['executed']['windows']==5 and scope['remaining']['windows']==1 and scope['windowsEolSupplementalApproval']['questionItemId']=='call_be127aa5d6874d618736fc7d3bd509ca' and scope['windowsFifthSupplementalApproval']['maximumTotalRuns']==5 and scope['windowsSixthSupplementalApproval']['maximumTotalRuns']==6 and scope['windowsSixthSupplementalApproval']['productTree']=='cb0aaee04d7a99e4b175e2b8b039a23afec85006'
+ scope=json.loads(scope_bytes);assert scope['sourceTreeWindows']==SOURCE and scope['limits']['feeUSD']==0 and scope['limits']['windowsRuns']==7 and scope['limits']['windowsMinutesEach']==60 and scope['limits']['automaticRerun'] is False and scope['executed']['windows']==6 and scope['remaining']['windows']==1 and scope['windowsEolSupplementalApproval']['questionItemId']=='call_be127aa5d6874d618736fc7d3bd509ca' and scope['windowsFifthSupplementalApproval']['maximumTotalRuns']==5 and scope['windowsSixthSupplementalApproval']['maximumTotalRuns']==6 and scope['windowsSixthSupplementalApproval']['productTree']=='cb0aaee04d7a99e4b175e2b8b039a23afec85006' and scope['windowsSeventhSupplementalApproval']['maximumTotalRuns']==7 and scope['windowsSeventhSupplementalApproval']['productTree']=='cb0aaee04d7a99e4b175e2b8b039a23afec85006' and scope['windowsSeventhSupplementalApproval']['approvedAtAsiaShanghai']=="2026-11-03T00:00:00+08:00" and scope['windowsSeventhSupplementalApproval']['cloudDispatchAuthorized'] is True
+ if os.environ.get('OMC_R1_GATE_ONLY')=='1':
+  print(json.dumps({'phase':'gate-only-pass','controller':'run-cloud.py','scopeSha':SCOPE_SHA,'sourceTree':SOURCE,'windowsRuns':scope['limits']['windowsRuns'],'executedWindows':scope['executed']['windows'],'remainingWindows':scope['remaining']['windows'],'seventhApprovedAt':scope['windowsSeventhSupplementalApproval']['approvedAtAsiaShanghai'],'cloudDispatchAuthorized':scope['windowsSeventhSupplementalApproval']['cloudDispatchAuthorized']}),flush=True)
+  return
  key=os.environ.pop('OMC_PREVIEW15_TRANSPORT_KEY');token=os.environ.pop('GH_TOKEN');assert len(key)==64
  clean=dict(os.environ);secret={**clean,'OMC_PREVIEW15_TRANSPORT_KEY':key}
  temp=Path(os.environ['RUNNER_TEMP']).resolve();work=temp/'omc-r1-controller';assert not work.exists();work.mkdir()
