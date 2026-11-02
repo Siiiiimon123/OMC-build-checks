@@ -4,7 +4,7 @@ from pathlib import Path,PurePosixPath
 
 REPO='Siiiiimon123/OMC-build-checks'
 SOURCE='d8368a3db1ee89d7f95282e3c75ae6efd3b7cc5e'
-SCOPE_SHA='f0d8c27aa241a468ffe2864d9d322e739393730f537b6b9246a3e8efd71a1968'
+SCOPE_SHA='a5fe452784aca7fa34fd0ebae0b101f02aa2dd6724d05c2d2e28f182b8d7adc7'
 PLAN_SHA='61ffec867be64dab00bb041acea9c4d5bb53a82e35935c12e9604af4330de7da'
 ZIP_SHA='060a1eab02e6a08060692b68048b4908c670e7f3aed1dca39cd12b2aa2912c87'
 BASE_SHA='9eda59434c38b50085edd041dd9a7b06e2476e6a99cc0e3c3a7c353695f9703d'
@@ -70,7 +70,7 @@ def main():
  # Git Windows checkout may change CRLF; only this frozen JSON text hashes canonical LF.
  # All archive/source/model/artifact SHA checks remain raw byte checks.
  here=Path(__file__).resolve().parent;scope_bytes=(here/'R1_EXECUTION_SCOPE.public.json').read_bytes();assert hashlib.sha256(scope_bytes.replace(b'\r\n',b'\n')).hexdigest()==SCOPE_SHA,'EXECUTION_SCOPE_TEXT_SHA'
- scope=json.loads(scope_bytes);assert scope['sourceTreeWindows']==SOURCE and scope['limits']['feeUSD']==0 and scope['limits']['windowsRuns']==4 and scope['limits']['windowsMinutesEach']==60 and scope['limits']['automaticRerun'] is False and scope['executed']['windows']==3 and scope['remaining']['windows']==1 and scope['windowsEolSupplementalApproval']['questionItemId']=='call_be127aa5d6874d618736fc7d3bd509ca'
+ scope=json.loads(scope_bytes);assert scope['sourceTreeWindows']==SOURCE and scope['limits']['feeUSD']==0 and scope['limits']['windowsRuns']==5 and scope['limits']['windowsMinutesEach']==60 and scope['limits']['automaticRerun'] is False and scope['executed']['windows']==4 and scope['remaining']['windows']==1 and scope['windowsEolSupplementalApproval']['questionItemId']=='call_be127aa5d6874d618736fc7d3bd509ca' and scope['windowsFifthSupplementalApproval']['maximumTotalRuns']==5 and scope['windowsFifthSupplementalApproval']['approvedAtAsiaShanghai']=='2026-11-02T15:16:00+08:00'
  key=os.environ.pop('OMC_PREVIEW15_TRANSPORT_KEY');token=os.environ.pop('GH_TOKEN');assert len(key)==64
  clean=dict(os.environ);secret={**clean,'OMC_PREVIEW15_TRANSPORT_KEY':key}
  temp=Path(os.environ['RUNNER_TEMP']).resolve();work=temp/'omc-r1-controller';assert not work.exists();work.mkdir()

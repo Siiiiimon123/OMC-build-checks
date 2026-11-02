@@ -3,7 +3,7 @@ $ErrorActionPreference='Stop'
 if($env:GITHUB_ACTIONS -ne 'true' -or $env:GITHUB_REPOSITORY -ne 'Siiiiimon123/OMC-build-checks' -or $env:GITHUB_REF -ne 'refs/heads/verify-windows-r1-18' -or $env:GITHUB_RUN_ATTEMPT -ne '1' -or [Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString() -ne 'X64'){throw 'Disposable approved x64 CI only; never member PC'}
 $node=(Get-Command node -CommandType Application|Select-Object -First 1).Source
 $inputs=Get-Content -LiteralPath ($InputsPath) -Raw|ConvertFrom-Json
-if($inputs.authorization -ne 'user-r1-execution-20261101' -or $inputs.sourceTree -ne '7fd90440ad51eb7abdf3407b6a25f09ca49a8604' -or $inputs.current.version -ne '1.0.21-preview.18' -or $inputs.previous.sha256 -ne '9eda59434c38b50085edd041dd9a7b06e2476e6a99cc0e3c3a7c353695f9703d'){throw 'New frozen built-source inputs required'}
+if($inputs.authorization -ne 'user-r1-execution-20261101' -or $inputs.sourceTree -ne 'd8368a3db1ee89d7f95282e3c75ae6efd3b7cc5e' -or $inputs.current.version -ne '1.0.21-preview.18' -or $inputs.previous.sha256 -ne '9eda59434c38b50085edd041dd9a7b06e2476e6a99cc0e3c3a7c353695f9703d'){throw 'New frozen built-source inputs required'}
 $work=Join-Path $env:RUNNER_TEMP 'omc-r1-x64';if(Test-Path -LiteralPath $work){throw 'Fresh owned workspace required'};[void][IO.Directory]::CreateDirectory($work)
 $report=[ordered]@{status='RUNNING';syntheticOnly=$true;memberDataUsed=$false;wizardClicksTested=$false;bareWindowsQualified=$false;newDependenciesInstalledForApp=$false;upgradeViaSignedInAppUpdateTested=$false;cleanupForced=$false}
 function Assert-LocalExact($asset,$file){
