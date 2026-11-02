@@ -4,7 +4,7 @@
   "repository": "Siiiiimon123/OMC-build-checks",
   "limits": {
     "feeUSD": 0,
-    "windowsRuns": 3,
+    "windowsRuns": 4,
     "windowsMinutesEach": 60,
     "macRuns": 2,
     "macMinutesEach": 90,
@@ -12,11 +12,11 @@
     "automaticRerun": false,
     "stopOnFirstSuccess": true
   },
-  "sourceTreeWindows": "7fd90440ad51eb7abdf3407b6a25f09ca49a8604",
+  "sourceTreeWindows": "d8368a3db1ee89d7f95282e3c75ae6efd3b7cc5e",
   "sourceTreeMac": "42a64bd6e221d12cad35f0bd8e7d85ee89237e6a",
   "backendBuiltFromMacTree": "126976cbb5e25f01bc1763294ba6a75800bc5f99",
   "executed": {
-    "windows": 2,
+    "windows": 3,
     "mac": 1
   },
   "remaining": {
@@ -24,8 +24,8 @@
     "mac": 1
   },
   "privateInputs": {
-    "windowsTarSha256": "0a6deb7179ff4689c44ed76189f28969962554621d36e0ed360a4c6a4bb72870",
-    "macZipSha256": "0ad964afdb803b721b1c9dde961d674bffa6c972b8e741df374f66d08c6d6eba"
+    "windowsTarSha256": "3cd265c16b25198bf27a7e66d16fbb3a6e6fc0f03c85d09ad76c1c05e39440a0",
+    "macZipSha256": "a60f2a02b45b5e798016858d617a31c48e9288b2214cedc2ba834645e8a2ea6e"
   },
   "existingBillingAndPrivacySettingsUnchanged": true,
   "productSourcePublished": false,
@@ -47,5 +47,18 @@
     "stopOnSuccess": true,
     "publicTextMaximumBytesCombined": 131072,
     "serverUpdateOnlyAfterActualAcceptance": true
+  },
+  "windowsEolSupplementalApproval": {
+    "questionItemId": "call_be127aa5d6874d618736fc7d3bd509ca",
+    "verbatimAnswer": "允许补这1次 Windows 验收",
+    "cardSha256": "1f9512a149e60ca70173e860ee0195caf670659f52856f78174e2cb7cfa62f5c",
+    "additionalRuns": 1,
+    "maximumTotalRuns": 4,
+    "minutesEach": 60,
+    "feeUSD": 0,
+    "automaticRerun": false,
+    "stopOnSuccess": true,
+    "sameThreeExistingPublicPaths": true,
+    "publishOnlyAfterActualAcceptance": true
   }
 }

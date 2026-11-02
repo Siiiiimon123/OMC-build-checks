@@ -3,10 +3,10 @@ import hashlib,json,os,platform,shutil,subprocess,sys,tarfile,time,traceback,url
 from pathlib import Path,PurePosixPath
 
 REPO='Siiiiimon123/OMC-build-checks'
-SOURCE='7fd90440ad51eb7abdf3407b6a25f09ca49a8604'
-SCOPE_SHA='3126da41a531a137ff05f56957b889e11cf32b6ecde8257aa4df5fc280076323'
-PLAN_SHA='e2effe55a43cbea0b6d6ffaf4f8f62e557f519711e877b2b6e275f0359461b6f'
-ZIP_SHA='69157f2bc67793f1887ed1a27cf5e4e566a802e708f07e2accbd4b44357b79f7'
+SOURCE='d8368a3db1ee89d7f95282e3c75ae6efd3b7cc5e'
+SCOPE_SHA='f0d8c27aa241a468ffe2864d9d322e739393730f537b6b9246a3e8efd71a1968'
+PLAN_SHA='61ffec867be64dab00bb041acea9c4d5bb53a82e35935c12e9604af4330de7da'
+ZIP_SHA='060a1eab02e6a08060692b68048b4908c670e7f3aed1dca39cd12b2aa2912c87'
 BASE_SHA='9eda59434c38b50085edd041dd9a7b06e2476e6a99cc0e3c3a7c353695f9703d'
 BASE_URL='https://omc.xiaoa.cyou/updates/targets/releases/'+BASE_SHA+'.OMC-Photo-Select-1.0.21-preview.16-x64.exe'
 
@@ -20,8 +20,8 @@ def safe(name):
  return p.parts
 def extract_tar(archive,root):
  with tarfile.open(archive) as t:
-  rows=t.getmembers();assert len(rows)==41 and len({r.name.lower() for r in rows})==len(rows)
-  assert sum(r.size for r in rows)==41055656
+  rows=t.getmembers();assert len(rows)==44 and len({r.name.lower() for r in rows})==len(rows)
+  assert sum(r.size for r in rows)==41094999
   for r in rows:assert r.isfile() and not r.issym() and not r.islnk();safe(r.name)
   root.mkdir()
   for r in rows:
@@ -30,7 +30,7 @@ def extract_tar(archive,root):
 def extract_source(archive,root,expected):
  assert sha(archive)==ZIP_SHA
  with zipfile.ZipFile(archive) as z:
-  rows=z.infolist();assert len(rows)==919 and len({r.filename for r in rows})==919
+  rows=z.infolist();assert len(rows)==923 and len({r.filename for r in rows})==923
   by={r['path']:r for r in expected};assert set(by)=={r.filename for r in rows}
   root.mkdir()
   for r in rows:
@@ -67,8 +67,10 @@ def main():
  assert os.environ.get('GITHUB_REF')=='refs/heads/verify-windows-r1-18' and os.environ.get('GITHUB_RUN_ATTEMPT')=='1'
  assert os.environ.get('RUNNER_OS')=='Windows' and os.environ.get('RUNNER_ARCH')=='X64' and platform.system()=='Windows'
  assert os.environ.get('OMC_R1_AUTHORIZATION_ID')=='user-r1-execution-20261101'
- here=Path(__file__).resolve().parent;assert sha(here/'R1_EXECUTION_SCOPE.public.json')==SCOPE_SHA
- scope=json.loads((here/'R1_EXECUTION_SCOPE.public.json').read_bytes());assert scope['sourceTreeWindows']==SOURCE and scope['limits']['feeUSD']==0 and scope['limits']['windowsRuns']==3 and scope['limits']['windowsMinutesEach']==60 and scope['limits']['automaticRerun'] is False and scope['executed']['windows']==2 and scope['remaining']['windows']==1 and scope['windowsSupplementalApproval']['questionItemId']=='call_111cc30030174d1abab39266e9dd9b9a'
+ # Git Windows checkout may change CRLF; only this frozen JSON text hashes canonical LF.
+ # All archive/source/model/artifact SHA checks remain raw byte checks.
+ here=Path(__file__).resolve().parent;scope_bytes=(here/'R1_EXECUTION_SCOPE.public.json').read_bytes();assert hashlib.sha256(scope_bytes.replace(b'\r\n',b'\n')).hexdigest()==SCOPE_SHA,'EXECUTION_SCOPE_TEXT_SHA'
+ scope=json.loads(scope_bytes);assert scope['sourceTreeWindows']==SOURCE and scope['limits']['feeUSD']==0 and scope['limits']['windowsRuns']==4 and scope['limits']['windowsMinutesEach']==60 and scope['limits']['automaticRerun'] is False and scope['executed']['windows']==3 and scope['remaining']['windows']==1 and scope['windowsEolSupplementalApproval']['questionItemId']=='call_be127aa5d6874d618736fc7d3bd509ca'
  key=os.environ.pop('OMC_PREVIEW15_TRANSPORT_KEY');token=os.environ.pop('GH_TOKEN');assert len(key)==64
  clean=dict(os.environ);secret={**clean,'OMC_PREVIEW15_TRANSPORT_KEY':key}
  temp=Path(os.environ['RUNNER_TEMP']).resolve();work=temp/'omc-r1-controller';assert not work.exists();work.mkdir()
@@ -134,7 +136,7 @@ def main():
  try:
   phase('authenticated-compact-input')
   archive=work/'input.tar';run(['node',helper,'fetch','--manifest',here/'INPUT.json','--id','r1-windows','--output',archive],'transport.log',180,env=secret)
-  assert archive.stat().st_size==41093120 and sha(archive)=='0a6deb7179ff4689c44ed76189f28969962554621d36e0ed360a4c6a4bb72870'
+  assert archive.stat().st_size==41134080 and sha(archive)=='3cd265c16b25198bf27a7e66d16fbb3a6e6fc0f03c85d09ad76c1c05e39440a0'
   payload=work/'payload';extract_tar(archive,payload);assert sha(payload/'PLAN.json')==PLAN_SHA
   sm=json.loads((payload/'source-inputs.json').read_bytes());expected=sm['records'] if isinstance(sm,dict) else sm
   extract_source(payload/'source.zip',payload/'source',expected)
@@ -198,4 +200,7 @@ def main():
  publish(token,[output],tag,receipt['releaseId']);print(json.dumps(receipt),flush=True);return status
 if __name__=='__main__':
  try:raise SystemExit(main())
- except Exception:print('{"phase":"controller-failed","exitCode":1}',flush=True);raise SystemExit(1)
+ except Exception as error:
+  frames=traceback.extract_tb(error.__traceback__)
+  print(json.dumps({'phase':'controller-failed','exitCode':1,'failureCategory':'EXECUTION_SCOPE_TEXT_SHA' if isinstance(error,AssertionError) and error.args==('EXECUTION_SCOPE_TEXT_SHA',) else type(error).__name__,'sourceLine':frames[-1].lineno if frames else None}),flush=True)
+  raise SystemExit(1)
