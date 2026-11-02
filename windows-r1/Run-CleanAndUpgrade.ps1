@@ -50,9 +50,10 @@ function Get-UninstallResiduals([string]$installRoot){
       $hits.Add([ordered]@{hive=$hive; keyPath=$_.PSPath; psChildName=$_.PSChildName; values=$vals}) | Out-Null
     }
   }
-  # Return a plain object[] (never @($genericList)): @($List[object] of OrderedDictionary)
-  # throws 'Argument types do not match' under pwsh on windows-2025 (seventh run 41477624466).
-  # Unary comma prevents Windows PowerShell 5 from unwrapping empty/typed arrays to $null on return.
+  # Return a plain object[] via unary comma (never @($genericList) — seventh pwsh Argument-types).
+  # Unary comma keeps empty object[] from collapsing to $null under Windows PowerShell 5.
+  # Callers MUST assign the function output directly ($x = Get-UninstallResiduals ...) and test $x.Count.
+  # Do NOT wrap the call in @(...): that re-nests the empty array so Count becomes 1 (eighth FAIL [[]]).
   [object[]]$arr = $hits.ToArray()
   if ($arr.Length -eq 0) { return ,[object[]]@() }
   return ,$arr
@@ -106,15 +107,46 @@ function WaitOwnedUninstall([string]$installRoot){
   }
   # Poll HKCU+HKLM residuals belonging to this install directory for up to 120s
   $pollDeadline=[DateTime]::UtcNow.AddSeconds(120)
-  $residuals=@()
+  $residuals = ,[object[]]@()
   do {
-    $residuals=@(Get-UninstallResiduals $installRoot)
-    if(-not $residuals.Count){ return }
+    # Direct assign (no @() wrap) so empty unary-comma return yields Count 0, not nested Count 1.
+    $residuals = Get-UninstallResiduals $installRoot
+    if ($null -eq $residuals) { $residuals = ,[object[]]@() }
+    if (-not $residuals.Count) { return }
     Start-Sleep -Milliseconds 500
   } while([DateTime]::UtcNow -lt $pollDeadline)
-  $script:report.uninstallResiduals=$residuals
-  $detail=($residuals | ForEach-Object { $_.keyPath + ' => ' + (($_.values.GetEnumerator()|ForEach-Object{ $_.Key+'='+$_.Value }) -join '; ') }) -join ' || '
-  throw ('Owned18 uninstall did not remove canonical registration; residuals: '+$detail)
+  $script:report.uninstallResiduals = $residuals
+    $detail = ($residuals | ForEach-Object {
+    # Indexer access: OrderedDictionary.Values property shadows the 'values' entry key.
+    if ($null -eq $_) {
+      '<null-entry>'
+    } else {
+      $kp = $null
+      $vals = $null
+      if ($_ -is [System.Collections.IDictionary]) {
+        if ($_.Contains('keyPath')) { $kp = $_['keyPath'] }
+        if ($_.Contains('values')) { $vals = $_['values'] }
+      } else {
+        if ($null -ne $_.PSObject.Properties['keyPath']) { $kp = $_.keyPath }
+        if ($null -ne $_.PSObject.Properties['values']) { $vals = $_.values }
+      }
+      if ($null -eq $kp) { $kp = '<null-keyPath>' } else { $kp = [string]$kp }
+      $parts = New-Object System.Collections.Generic.List[string]
+      if ($null -eq $vals) {
+        [void]$parts.Add('<null-values>')
+      } elseif ($vals -is [System.Collections.IDictionary]) {
+        foreach ($de in @($vals.GetEnumerator())) {
+          $k = if ($null -eq $de.Key) { '' } else { [string]$de.Key }
+          $v = if ($null -eq $de.Value) { '' } else { [string]$de.Value }
+          [void]$parts.Add($k + '=' + $v)
+        }
+      } else {
+        [void]$parts.Add('<non-dict-values>')
+      }
+      $kp + ' => ' + ($parts -join '; ')
+    }
+  }) -join ' || '
+  throw ('Owned18 uninstall did not remove canonical registration; residuals: ' + $detail)
 }
 function CheckPng($file){Add-Type -AssemblyName System.Drawing;$b=[Drawing.Bitmap]::new($file);try{$colors=[Collections.Generic.HashSet[int]]::new();for($y=0;$y -lt $b.Height;$y+=17){for($x=0;$x -lt $b.Width;$x+=17){[void]$colors.Add($b.GetPixel($x,$y).ToArgb())}};if($colors.Count -lt 8){throw 'Actual renderer screenshot is blank/uniform'};return @{width=$b.Width;height=$b.Height;distinctSampledColors=$colors.Count}}finally{$b.Dispose()}}
 function OpenActualLink($root,$profile,$mode,$out,$expectedVersion,$snapshot){
@@ -154,7 +186,7 @@ try{
  # Disposable runner only. Preserve clean18 default profile; upgrade uses a separate owned synthetic profile.
  $root=InstallRoot
  WaitOwnedUninstall $root
- if((Registrations).Count -or @(Get-UninstallResiduals $root).Count){ $report.uninstallResiduals=@(Get-UninstallResiduals $root); throw 'Owned18 uninstall did not remove canonical registration' }
+ $postResiduals = Get-UninstallResiduals $root; if ($null -eq $postResiduals) { $postResiduals = ,[object[]]@() }; if ((Registrations).Count -or $postResiduals.Count) { $report.uninstallResiduals = $postResiduals; throw 'Owned18 uninstall did not remove canonical registration' }
  WaitInstaller $old '/S';$root16=InstallRoot;if((Get-FileHash -LiteralPath (Join-Path $root16 'resources/app.asar') -Algorithm SHA256).Hash.ToLowerInvariant() -ne $inputs.previous.asarSha256){throw 'Genuine released16 payload mismatch'}
  $upgradeProfile=Join-Path $work 'upgrade-profile';$snapshot=Join-Path $work 'synthetic-project-snapshot.json'
  $report.seed16=OpenActualLink $root16 $upgradeProfile '--seed' (Join-Path $env:RUNNER_TEMP 'UPGRADE16_SEED.json') $inputs.previous.version $snapshot
