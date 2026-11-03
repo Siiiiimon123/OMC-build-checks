@@ -49,6 +49,8 @@ async function isolated(run) {
   const originalGithubToken = process.env.GITHUB_TOKEN;
   const originalGhToken = process.env.GH_TOKEN;
   const stderr = [];
+  delete process.env.GITHUB_TOKEN;
+  delete process.env.GH_TOKEN;
   process.stderr.write = function(chunk, ...args) { stderr.push(String(chunk)); return true; };
   try { await run({ dir, stderr }); }
   finally {
@@ -91,6 +93,7 @@ test('sources rotate in order across transient failures', async () => {
   await isolated(async ({ dir }) => {
     const { a, cipher, plain } = fixture();
     a.urls = ['https://api.github.com/repos/example/private/releases/assets/123', 'https://cn.example.test/cipher'];
+    process.env.GITHUB_TOKEN = 'rotation-test-token';
     const hosts = [];
     global.fetch = async (url, options) => {
       hosts.push(url.host);
@@ -157,12 +160,57 @@ test('corrupted preferred source fails authentication without trying the fallbac
   await isolated(async ({ dir }) => {
     const { a, cipher } = fixture();
     a.urls = ['https://api.github.com/repos/example/private/releases/assets/123', 'https://cn.example.test/cipher'];
+    process.env.GITHUB_TOKEN = 'corruption-test-token';
     const bad = Buffer.from(cipher); bad[0] ^= 1;
     let calls = 0;
     global.fetch = async (_url, options) => { calls++; return response(200, bad, options.signal); };
     await assert.rejects(fetchAsset(a, path.join(dir, 'out'), key, timings));
     assert.equal(calls, 1);
     assert.deepEqual(await fsp.readdir(dir), []);
+  });
+});
+
+test('without a token CN is preferred and the private asset is skipped across retries', async () => {
+  await isolated(async ({ dir }) => {
+    const { a, cipher, plain } = fixture();
+    a.url = 'https://cn.example.test/cipher';
+    a.urls = [a.url, 'https://api.github.com/repos/example/private/releases/assets/123'];
+    const hosts = [];
+    global.fetch = async (url, options) => {
+      hosts.push(url.host);
+      assert.equal(options.headers.Authorization, undefined);
+      return hosts.length === 1 ? response(503, null, options.signal) : response(200, cipher, options.signal);
+    };
+    await fetchAsset(a, path.join(dir, 'out'), key, timings);
+    assert.deepEqual(hosts, ['cn.example.test', 'cn.example.test']);
+    assert.deepEqual(await fsp.readFile(path.join(dir, 'out')), plain);
+  });
+});
+
+test('without a token an asset-only source fails before any request', async () => {
+  await isolated(async ({ dir }) => {
+    const { a } = fixture();
+    a.urls = ['https://api.github.com/repos/example/private/releases/assets/123'];
+    let calls = 0;
+    global.fetch = async () => { calls++; throw new Error('unexpected request'); };
+    await assert.rejects(fetchAsset(a, path.join(dir, 'out'), key, timings), /NO_AVAILABLE_SOURCE/);
+    assert.equal(calls, 0);
+  });
+});
+
+test('without a token a redirect to a private asset is skipped and CN retries', async () => {
+  await isolated(async ({ dir }) => {
+    const { a, cipher, plain } = fixture();
+    a.urls = ['https://cn.example.test/cipher'];
+    let calls = 0;
+    global.fetch = async (url, options) => {
+      assert.equal(url.host, 'cn.example.test');
+      if (++calls === 1) return { status: 302, ok: false, body: null, headers: new Headers({ location: 'https://api.github.com/repos/example/private/releases/assets/123' }) };
+      return response(200, cipher, options.signal);
+    };
+    await fetchAsset(a, path.join(dir, 'out'), key, timings);
+    assert.equal(calls, 2);
+    assert.deepEqual(await fsp.readFile(path.join(dir, 'out')), plain);
   });
 });
 

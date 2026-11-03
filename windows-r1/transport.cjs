@@ -58,7 +58,11 @@ async function fetchAsset(a,output,key,options={}) {
   validate(a); await absent(output);
   const sources=a.urls===undefined?[a.url]:a.urls;
   if(!Array.isArray(sources)||sources.length===0||sources.some(x=>typeof x!=='string'||!x)) fail('INVALID_MANIFEST');
-  const urls=sources.map(x=>{let url;try{url=new URL(x);}catch{fail('HTTPS_REQUIRED');}if(url.protocol!=='https:'||url.username||url.password) fail('HTTPS_REQUIRED');return url;});
+  const parsed=sources.map(x=>{let url;try{url=new URL(x);}catch{fail('HTTPS_REQUIRED');}if(url.protocol!=='https:'||url.username||url.password) fail('HTTPS_REQUIRED');return url;});
+  const token=(process.env.GITHUB_TOKEN||'').trim()||(process.env.GH_TOKEN||'').trim();
+  const isGithubAsset=url=>url.origin==='https://api.github.com'&&/^\/repos\/[^/]+\/[^/]+\/releases\/assets\/\d+\/?$/.test(url.pathname);
+  const urls=parsed.filter(url=>token||!isGithubAsset(url));
+  if(!urls.length) fail('NO_AVAILABLE_SOURCE');
   const {idleTimeoutMs=30000,attemptTimeoutMs=150000,totalTimeoutMs=275000,maxAttempts=3,backoffMs=2000,progressIntervalMs=15000}=options;
   const deadline=Date.now()+totalTimeoutMs;
   let lastError;
@@ -78,10 +82,10 @@ async function fetchAsset(a,output,key,options={}) {
       let url=initial,response;
       for(let redirects=0;;redirects++) {
         host=url.host;
+        if(!token&&isGithubAsset(url)) {const error=new Error('NO_TOKEN_FOR_GITHUB_ASSET');error.retryable=true;throw error;}
         const headers={};
         if(url.origin==='https://api.github.com') {
           headers.Accept='application/octet-stream';
-          const token=process.env.GITHUB_TOKEN||process.env.GH_TOKEN;
           if(token) headers.Authorization=`Bearer ${token}`;
         }
         response=await fetch(url,{signal:controller.signal,redirect:'manual',headers});status=response.status;log('headers');
