@@ -1,5 +1,6 @@
 param([string]$InputsPath=(Join-Path $PSScriptRoot 'PACKAGE_INPUTS.json'),[string]$BuiltCurrentInstaller,[string]$BuiltPreviousInstaller,[switch]$OmcHelpersOnly)
 $ErrorActionPreference='Stop'
+. (Join-Path $PSScriptRoot 'Wait-Installer.ps1')
 function Assert-LocalExact($asset,$file){
   $root=[IO.Path]::GetFullPath($env:RUNNER_TEMP).TrimEnd('\')+'\';$absolute=[IO.Path]::GetFullPath($file)
   if(-not $absolute.StartsWith($root,[StringComparison]::OrdinalIgnoreCase)){throw 'Local installer outside owned RunnerTemp'}
@@ -9,10 +10,9 @@ function Assert-LocalExact($asset,$file){
 
 function DownloadExact($asset,$target){Invoke-WebRequest -Uri $asset.url -OutFile $target -TimeoutSec 900;if((Get-Item -LiteralPath $target).Length -ne $asset.bytes -or (Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash.ToLowerInvariant() -ne $asset.sha256){throw 'Installer download identity mismatch'}}
 function NormalizeDir([string]$p){ if([string]::IsNullOrWhiteSpace($p)){ return $null }; try { return [IO.Path]::GetFullPath($p).TrimEnd([char]92) } catch { return $null } }
-function Registrations { return ,[object[]]@(Get-ChildItem 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall' -ErrorAction SilentlyContinue|ForEach-Object {Get-ItemProperty -LiteralPath $_.PSPath}|Where-Object {$_.DisplayName -like 'OMC*Preview*'}) }
+function Registrations { $hive='HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall'; if(-not (Test-Path -LiteralPath $hive -ErrorAction Stop)){return ,[object[]]@()}; return ,[object[]]@(Get-ChildItem -LiteralPath $hive -ErrorAction Stop|ForEach-Object {Get-ItemProperty -LiteralPath $_.PSPath -ErrorAction Stop}|Where-Object {$_.DisplayName -like 'OMC*Preview*'}) }
 function InstallRoot { $reg=Registrations;if($reg.Count -ne 1){throw 'Exact canonical registration required'};[IO.Path]::GetFullPath((Get-ItemProperty -LiteralPath ('HKCU:\Software\'+$reg[0].PSChildName) -Name InstallLocation).InstallLocation) }
-function WaitInstaller($file,$args){$p=Start-Process -FilePath $file -ArgumentList $args -PassThru -WindowStyle Hidden;if(!$p.WaitForExit(120000)){throw 'Owned installer timeout'};if($p.ExitCode -ne 0){throw ('Installer exit '+$p.ExitCode)}}
-function Get-UninstallResiduals([string]$installRoot){
+function Get-UninstallResiduals([string]$installRoot,[string]$canonicalId){
   $want=NormalizeDir $installRoot
   $hits=New-Object System.Collections.Generic.List[object]
   $uninstallHives=@(
@@ -21,30 +21,33 @@ function Get-UninstallResiduals([string]$installRoot){
     'HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall'
   )
   foreach($hive in $uninstallHives){
-    Get-ChildItem -LiteralPath $hive -ErrorAction SilentlyContinue | ForEach-Object {
-      $props=Get-ItemProperty -LiteralPath $_.PSPath -ErrorAction SilentlyContinue
-      if(-not $props){ return }
+    if(-not (Test-Path -LiteralPath $hive -ErrorAction Stop)){continue}
+    Get-ChildItem -LiteralPath $hive -ErrorAction Stop | ForEach-Object {
+      $props=Get-ItemProperty -LiteralPath $_.PSPath -ErrorAction Stop
+      # A real registry key with no values returns null; verify it still exists.
+      if($null -eq $props){ Get-Item -LiteralPath $_.PSPath -ErrorAction Stop | Out-Null }
+      $canonical=($canonicalId -and $hive -eq 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall' -and $_.PSChildName -eq $canonicalId)
+      if($null -eq $props){ if($canonical){$hits.Add([ordered]@{hive=$hive; keyPath=$_.PSPath; psChildName=$_.PSChildName; values=@{}}) | Out-Null}; return }
       $loc=$null
       if($props.PSObject.Properties.Name -contains 'InstallLocation'){ $loc=NormalizeDir ([string]$props.InstallLocation) }
-      $name=[string]$props.DisplayName
-      $isOmC = ($name -like 'OMC*Preview*') -or ($name -like 'OMC*')
       $pathMatch = $loc -and $want -and ($loc.Equals($want,[StringComparison]::OrdinalIgnoreCase))
-      if($pathMatch -or ($isOmC -and $pathMatch)){
-        if($pathMatch){
+      if($pathMatch -or $canonical){
           $vals=@{}; foreach($pn in @('DisplayName','DisplayVersion','InstallLocation','UninstallString','QuietUninstallString','Publisher')){ if($props.PSObject.Properties.Name -contains $pn){ $vals[$pn]=[string]$props.$pn } }
           $hits.Add([ordered]@{hive=$hive; keyPath=$_.PSPath; psChildName=$_.PSChildName; values=$vals}) | Out-Null
-        }
       }
     }
   }
   $softwareHives=@('HKCU:\Software','HKLM:\Software','HKLM:\Software\WOW6432Node')
   foreach($hive in $softwareHives){
-    Get-ChildItem -LiteralPath $hive -ErrorAction SilentlyContinue | ForEach-Object {
-      $props=Get-ItemProperty -LiteralPath $_.PSPath -ErrorAction SilentlyContinue
-      if(-not $props){ return }
-      if($props.PSObject.Properties.Name -notcontains 'InstallLocation'){ return }
+    if(-not (Test-Path -LiteralPath $hive -ErrorAction Stop)){continue}
+    Get-ChildItem -LiteralPath $hive -ErrorAction Stop | ForEach-Object {
+      $props=Get-ItemProperty -LiteralPath $_.PSPath -ErrorAction Stop
+      if($null -eq $props){ Get-Item -LiteralPath $_.PSPath -ErrorAction Stop | Out-Null }
+      $canonical=($canonicalId -and $hive -eq 'HKCU:\Software' -and $_.PSChildName -eq $canonicalId)
+      if($null -eq $props){ if($canonical){$hits.Add([ordered]@{hive=$hive; keyPath=$_.PSPath; psChildName=$_.PSChildName; values=@{}}) | Out-Null}; return }
+      if($props.PSObject.Properties.Name -notcontains 'InstallLocation'){ if($canonical){$hits.Add([ordered]@{hive=$hive; keyPath=$_.PSPath; psChildName=$_.PSChildName; values=@{}}) | Out-Null}; return }
       $loc=NormalizeDir ([string]$props.InstallLocation)
-      if(-not ($loc -and $want -and $loc.Equals($want,[StringComparison]::OrdinalIgnoreCase))){ return }
+      if(-not $canonical -and -not ($loc -and $want -and $loc.Equals($want,[StringComparison]::OrdinalIgnoreCase))){ return }
       $vals=@{InstallLocation=[string]$props.InstallLocation}
       if($props.PSObject.Properties.Name -contains 'DisplayName'){ $vals['DisplayName']=[string]$props.DisplayName }
       $hits.Add([ordered]@{hive=$hive; keyPath=$_.PSPath; psChildName=$_.PSChildName; values=$vals}) | Out-Null
@@ -59,10 +62,11 @@ function Get-UninstallResiduals([string]$installRoot){
   return ,$arr
 }
 
-function WaitOwnedUninstall([string]$installRoot){
+function WaitOwnedUninstall([string]$installRoot,[string]$canonicalId){
   $reg=Registrations
   if($reg.Count -ne 1){ throw 'Exact canonical registration required before uninstall' }
   $entry=$reg[0]
+  if([string]::IsNullOrWhiteSpace($canonicalId) -or [string]$entry.PSChildName -ne $canonicalId){throw 'Canonical registration identity changed before uninstall'}
   $quiet=[string]$entry.QuietUninstallString
   if([string]::IsNullOrWhiteSpace($quiet)){ throw 'QuietUninstallString missing on canonical Uninstall key' }
   if($quiet -notmatch '(?i)/currentuser'){ $quiet = $quiet.TrimEnd() + ' /currentuser' }
@@ -107,11 +111,11 @@ function WaitOwnedUninstall([string]$installRoot){
   }
   # Poll HKCU+HKLM residuals belonging to this install directory for up to 120s
   $pollDeadline=[DateTime]::UtcNow.AddSeconds(120)
-  $residuals = ,[object[]]@()
+  $residuals = [object[]]@()
   do {
     # Direct assign (no @() wrap) so empty unary-comma return yields Count 0, not nested Count 1.
-    $residuals = Get-UninstallResiduals $installRoot
-    if ($null -eq $residuals) { $residuals = ,[object[]]@() }
+    $residuals = Get-UninstallResiduals $installRoot $canonicalId
+    if ($null -eq $residuals) { throw 'Residual inspection returned null' }
     if (-not $residuals.Count) { return }
     Start-Sleep -Milliseconds 500
   } while([DateTime]::UtcNow -lt $pollDeadline)
@@ -185,12 +189,15 @@ try{
  $clean=Get-Content -LiteralPath (Join-Path $env:RUNNER_TEMP 'omc-first-install-report.json') -Raw|ConvertFrom-Json;if($clean.status -ne 'PASS_SCOPED_CANONICAL_FIRST_INSTALL_AND_DEFAULT_STARTUP' -or !$clean.normalExitVerified){throw 'Clean18 failed'};$report.clean18=$clean;$report.cleanScreenshot=CheckPng ((Join-Path $env:RUNNER_TEMP 'CLEAN_NATIVE_AI.json')+'.png')
  # Disposable runner only. Preserve clean18 default profile; upgrade uses a separate owned synthetic profile.
  $root=InstallRoot
- WaitOwnedUninstall $root
- $postResiduals = Get-UninstallResiduals $root; if ($null -eq $postResiduals) { $postResiduals = ,[object[]]@() }; if ((Registrations).Count -or $postResiduals.Count) { $report.uninstallResiduals = $postResiduals; throw 'Owned18 uninstall did not remove canonical registration' }
- WaitInstaller $old '/S';$root16=InstallRoot;if((Get-FileHash -LiteralPath (Join-Path $root16 'resources/app.asar') -Algorithm SHA256).Hash.ToLowerInvariant() -ne $inputs.previous.asarSha256){throw 'Genuine released16 payload mismatch'}
+ $beforeUninstall=Registrations;if($beforeUninstall.Count -ne 1){throw 'Exact canonical registration required before uninstall'}
+ $canonicalId=[string]$beforeUninstall[0].PSChildName;$canonicalGuid=[Guid]::Empty
+ if(-not [Guid]::TryParse($canonicalId,[ref]$canonicalGuid)){throw 'Unexpected installation registration identity'}
+ WaitOwnedUninstall $root $canonicalId
+ $postResiduals = Get-UninstallResiduals $root $canonicalId; if ($null -eq $postResiduals) { throw 'Residual inspection returned null' }; if ((Registrations).Count -or $postResiduals.Count) { $report.uninstallResiduals = $postResiduals; throw 'Owned18 uninstall did not remove canonical registration' }
+ WaitInstaller -File $old -Report $report;$root16=InstallRoot;if((Get-FileHash -LiteralPath (Join-Path $root16 'resources/app.asar') -Algorithm SHA256).Hash.ToLowerInvariant() -ne $inputs.previous.asarSha256){throw 'Genuine released16 payload mismatch'}
  $upgradeProfile=Join-Path $work 'upgrade-profile';$snapshot=Join-Path $work 'synthetic-project-snapshot.json'
  $report.seed16=OpenActualLink $root16 $upgradeProfile '--seed' (Join-Path $env:RUNNER_TEMP 'UPGRADE16_SEED.json') $inputs.previous.version $snapshot
- WaitInstaller $new '/S';$root18=InstallRoot;if((Get-FileHash -LiteralPath (Join-Path $root18 'resources/app.asar') -Algorithm SHA256).Hash.ToLowerInvariant() -ne $inputs.current.asarSha256 -or (Get-FileHash -LiteralPath (Join-Path $root18 'resources/ai-service/ai-service.exe') -Algorithm SHA256).Hash.ToLowerInvariant() -ne $inputs.current.backendSha256){throw 'Upgraded18 bytes differ'}
+ WaitInstaller -File $new -Report $report;$root18=InstallRoot;if((Get-FileHash -LiteralPath (Join-Path $root18 'resources/app.asar') -Algorithm SHA256).Hash.ToLowerInvariant() -ne $inputs.current.asarSha256 -or (Get-FileHash -LiteralPath (Join-Path $root18 'resources/ai-service/ai-service.exe') -Algorithm SHA256).Hash.ToLowerInvariant() -ne $inputs.current.backendSha256){throw 'Upgraded18 bytes differ'}
  $report.restore18=OpenActualLink $root18 $upgradeProfile '--restore' (Join-Path $env:RUNNER_TEMP 'UPGRADE18_RESTORED.json') $inputs.current.version $snapshot
  $report.status='PASS_SCOPED_CLEAN18_AND_REAL_RELEASED16_TO18_INSTALLER_UPGRADE_SYNTHETIC_PROJECT_AI_EXIT'
 }catch{$report.status='FAIL';$report.failure=$_.Exception.Message;throw}

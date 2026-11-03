@@ -8,6 +8,7 @@ param(
   [Parameter(Mandatory=$true)][string]$ExpectedVersion
 )
 $ErrorActionPreference='Stop'
+. (Join-Path $PSScriptRoot 'Wait-Installer.ps1')
 if($env:GITHUB_REF -ne 'refs/heads/verify-windows-r1-18' -or $env:GITHUB_RUN_ATTEMPT -ne '1'){throw 'Approved branch/first attempt only'}
 if($env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_OS -ne 'Windows' -or $env:GITHUB_REPOSITORY -ne 'Siiiiimon123/OMC-build-checks') {throw 'This script is only for the approved disposable GitHub Windows runner, never the user PC'}
 $profile=Join-Path $env:APPDATA 'omc-photo-select'
@@ -57,9 +58,7 @@ try {
   }
   $result.notes+=@('Standard interactive desktop directory is initialized before install if absent; missing-desktop installation is not qualified')
 
-  $installProcess=Start-Process -FilePath $Installer -ArgumentList '/S' -PassThru
-  if(!$installProcess.WaitForExit(120000)){throw 'Installer timeout'}
-  if($installProcess.ExitCode -ne 0){throw ('Installer exit: '+$installProcess.ExitCode)}
+  WaitInstaller -File $Installer -Report $result
   $result.canonicalInstallExecuted=$true
   $registration=Find-Registration
   if($registration.Count -ne 1){throw 'Expected exactly one new installation registration'}
