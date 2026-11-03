@@ -13,9 +13,9 @@ function validate(a) {
   if (!a || !/^[a-z][a-z0-9-]{0,31}$/.test(a.id) || !Number.isSafeInteger(a.plaintextBytes) || a.plaintextBytes < 1 || a.plaintextBytes > MAX || a.ciphertextBytes !== a.plaintextBytes || !hex(a.plaintextSha256,64) || !hex(a.ciphertextSha256,64) || !hex(a.nonceHex,24) || !hex(a.tagHex,32)) fail('INVALID_MANIFEST');
 }
 function aad(a) { return Buffer.from(`${SCHEMA}|${a.id}|${a.plaintextSha256}|${a.plaintextBytes}`); }
-function meter(max) {
+function meter(max, onBytes) {
   let bytes = 0; const hash = crypto.createHash('sha256');
-  const stream = new Transform({ transform(b, e, cb) { bytes += b.length; if(bytes > max) return cb(new Error('SIZE_LIMIT')); hash.update(b); cb(null,b); }});
+  const stream = new Transform({ transform(b, e, cb) { bytes += b.length; if(onBytes) onBytes(b.length); if(bytes > max) return cb(new Error('SIZE_LIMIT')); hash.update(b); cb(null,b); }});
   return { stream, result: () => ({bytes, sha256:hash.digest('hex')}) };
 }
 async function inspect(p) {
@@ -41,9 +41,9 @@ async function encrypt({input,output,id,key,expectedSha,expectedBytes}) {
     await commit(temp,output);return a;
   } finally { await fsp.unlink(temp).catch(e=>{if(e.code!=='ENOENT')throw e;}); }
 }
-async function decryptStream(source,a,output,key) {
+async function decryptStream(source,a,output,key,onBytes) {
   validate(a);await absent(output); const temp=output+'.'+crypto.randomUUID()+'.part';
-  const cipherMeter=meter(a.ciphertextBytes),plainMeter=meter(a.plaintextBytes);
+  const cipherMeter=meter(a.ciphertextBytes,onBytes),plainMeter=meter(a.plaintextBytes);
   const dec=crypto.createDecipheriv('aes-256-gcm',key,Buffer.from(a.nonceHex,'hex'));dec.setAAD(aad(a));dec.setAuthTag(Buffer.from(a.tagHex,'hex'));
   try {
     await pipeline(source,cipherMeter.stream,dec,plainMeter.stream,fs.createWriteStream(temp,{flags:'wx',mode:0o600}));
@@ -52,12 +52,65 @@ async function decryptStream(source,a,output,key) {
     await commit(temp,output);return {id:a.id,bytes:p.bytes,sha256:p.sha256,authenticated:true};
   } finally {await fsp.unlink(temp).catch(e=>{if(e.code!=='ENOENT')throw e;});}
 }
-async function fetchAsset(a,output,key) {
-  const u=new URL(a.url);if(u.protocol!=='https:'||u.username||u.password) fail('HTTPS_REQUIRED');
-  const response=await fetch(u,{signal:AbortSignal.timeout(70*60*1000)});
-  if(!response.ok||!response.body)fail('DOWNLOAD_FAILED');
-  const length=response.headers.get('content-length');if(length && Number(length)!==a.ciphertextBytes)fail('DOWNLOAD_LENGTH');
-  return decryptStream(Readable.fromWeb(response.body),a,output,key);
+// Production bounds: at most three attempts, 30 s without bytes, 150 s per
+// attempt and 275 s overall (including backoff). Overrides are for local tests.
+async function fetchAsset(a,output,key,options={}) {
+  validate(a); await absent(output);
+  const initial=new URL(a.url);if(initial.protocol!=='https:'||initial.username||initial.password) fail('HTTPS_REQUIRED');
+  const {idleTimeoutMs=30000,attemptTimeoutMs=150000,totalTimeoutMs=275000,maxAttempts=3,backoffMs=2000,progressIntervalMs=15000}=options;
+  const deadline=Date.now()+totalTimeoutMs;
+  let lastError;
+  for(let attempt=1;attempt<=maxAttempts;attempt++) {
+    const remaining=deadline-Date.now();if(remaining<=0) break;
+    const started=Date.now(), controller=new AbortController();
+    let host=initial.host,status=null,bytes=0,reason=null,source=null,idleTimer;
+    const log=(event,why=null)=>process.stderr.write(JSON.stringify({event,attempt,status,bytes,elapsedMs:Date.now()-started,reason:why,host})+'\n');
+    const abort=(why)=>{if(reason) return;reason=why;controller.abort();if(source) source.destroy(new Error(why));};
+    const resetIdle=()=>{clearTimeout(idleTimer);idleTimer=setTimeout(()=>abort('IDLE_TIMEOUT'),idleTimeoutMs);};
+    const attemptTimer=setTimeout(()=>abort(remaining<=attemptTimeoutMs?'TOTAL_TIMEOUT':'ATTEMPT_TIMEOUT'),Math.min(attemptTimeoutMs,remaining));
+    const progress=setInterval(()=>log('progress'),progressIntervalMs);
+    resetIdle();log('attempt_start');
+    let retry=false,stage='fetch';
+    try {
+      let url=initial,response;
+      for(let redirects=0;;redirects++) {
+        host=url.host;
+        response=await fetch(url,{signal:controller.signal,redirect:'manual'});status=response.status;log('headers');
+        if([301,302,303,307,308].includes(status)) {
+          const location=response.headers.get('location');
+          if(response.body) response.body.cancel().catch(()=>{});
+          if(!location||redirects>=5) fail('DOWNLOAD_REDIRECT');
+          url=new URL(location,url);if(url.protocol!=='https:'||url.username||url.password) fail('HTTPS_REQUIRED');
+          continue;
+        }
+        break;
+      }
+      if(!response.ok||!response.body) {
+        if(response.body) response.body.cancel().catch(()=>{});
+        const error=new Error('DOWNLOAD_FAILED');
+        error.retryable=status===408||status===429||status>=500;throw error;
+      }
+      const length=response.headers.get('content-length');
+      if(length && Number(length)!==a.ciphertextBytes) {response.body.cancel().catch(()=>{});fail('DOWNLOAD_LENGTH');}
+      source=Readable.fromWeb(response.body);source.on('error',()=>{});stage='body';
+      const result=await decryptStream(source,a,output,key,n=>{bytes+=n;resetIdle();});
+      log('attempt_end','SUCCESS');return result;
+    } catch(error) {
+      lastError=error;
+      const networkCodes=new Set(['ECONNRESET','ECONNREFUSED','ETIMEDOUT','EPIPE','ENOTFOUND','EAI_AGAIN','UND_ERR_SOCKET','UND_ERR_CONNECT_TIMEOUT','UND_ERR_HEADERS_TIMEOUT','UND_ERR_BODY_TIMEOUT']);
+      let cause=error,network=false;
+      for(let depth=0;cause&&depth<5;depth++,cause=cause.cause) if(networkCodes.has(cause.code)) network=true;
+      // Do not classify a cryptographic, size, manifest or filesystem error as a
+      // network failure merely because an abort happened at the same time.
+      const aborted=reason && (error.message===reason||error.name==='AbortError'||error.code==='ABORT_ERR');
+      retry=Boolean(error.retryable||aborted||network||(stage==='fetch'&&error.name==='TypeError'));
+      const knownReasons=new Set(['CONTENT_MISMATCH','INVALID_MANIFEST','DOWNLOAD_LENGTH','DOWNLOAD_FAILED','DOWNLOAD_REDIRECT','HTTPS_REQUIRED','SIZE_LIMIT']);
+      log('attempt_end',aborted?reason:(error.retryable?'HTTP_RETRYABLE':network?'NETWORK_ERROR':knownReasons.has(error.message)?error.message:'NON_RETRYABLE'));
+    } finally {clearTimeout(idleTimer);clearTimeout(attemptTimer);clearInterval(progress);}
+    if(!retry||attempt===maxAttempts||deadline<=Date.now()) throw lastError;
+    await new Promise(resolve=>setTimeout(resolve,Math.min(backoffMs*2**(attempt-1),Math.max(0,deadline-Date.now()))));
+  }
+  throw lastError||new Error('TOTAL_TIMEOUT');
 }
 async function main() {
   const [action,...args]=process.argv.slice(2); const options={};for(let i=0;i<args.length;i+=2){if(!args[i].startsWith('--')||!args[i+1])fail('ARGUMENTS'); options[args[i].slice(2)]=args[i+1];}

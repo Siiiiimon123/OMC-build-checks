@@ -138,7 +138,9 @@ def main():
 
  try:
   phase('authenticated-compact-input')
-  archive=work/'input.tar';run(['node',helper,'fetch','--manifest',here/'INPUT.json','--id','r1-windows','--output',archive],'transport.log',180,env=secret)
+  # transport's overall download budget is 275 seconds; allow 25 seconds for
+  # startup and orderly cleanup without changing any other stage timeout.
+  archive=work/'input.tar';run(['node',helper,'fetch','--manifest',here/'INPUT.json','--id','r1-windows','--output',archive],'transport.log',300,env=secret)
   assert archive.stat().st_size==41175040 and sha(archive)=='f9d4142640375c69ba13a0ed8c44550a83522d7b26abe84b9a0d367a82d00daf'
   payload=work/'payload';extract_tar(archive,payload);assert sha(payload/'PLAN.json')==PLAN_SHA
   sm=json.loads((payload/'source-inputs.json').read_bytes());expected=sm['records'] if isinstance(sm,dict) else sm
