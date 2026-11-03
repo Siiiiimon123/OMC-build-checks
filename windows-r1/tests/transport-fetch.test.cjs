@@ -89,6 +89,33 @@ for (const githubStatus of [401, 403, 404]) test(`GitHub HTTP ${githubStatus} fa
   });
 });
 
+for (const githubStatus of [401, 403, 404]) test(`CN redirect to GitHub HTTP ${githubStatus} rotates sources without leaking Bearer`, async () => {
+  await isolated(async ({ dir, stderr }) => {
+    const { a, cipher, plain } = fixture();
+    a.urls = ['https://cn.example.test/cipher', 'https://fallback.example.test/cipher'];
+    process.env.GITHUB_TOKEN = 'cn-redirect-test-token';
+    const hosts = [];
+    global.fetch = async (url, options) => {
+      hosts.push(url.host);
+      if (hosts.length === 1) {
+        assert.equal(options.headers.Authorization, undefined);
+        return { status: 302, ok: false, body: null, headers: new Headers({ location: 'https://api.github.com/repos/example/private/releases/assets/123' }) };
+      }
+      if (hosts.length === 2) {
+        assert.equal(options.headers.Authorization, 'Bearer cn-redirect-test-token');
+        return response(githubStatus, null, options.signal);
+      }
+      assert.equal(options.headers.Authorization, undefined);
+      return response(200, cipher, options.signal);
+    };
+    await fetchAsset(a, path.join(dir, 'out'), key, timings);
+    assert.deepEqual(hosts, ['cn.example.test', 'api.github.com', 'fallback.example.test']);
+    assert.deepEqual(await fsp.readFile(path.join(dir, 'out')), plain);
+    assert.ok(entries(stderr).some(x => x.host === 'api.github.com' && x.status === githubStatus && x.reason === 'HTTP_RETRYABLE'));
+    assert.doesNotMatch(stderr.join(''), /cn-redirect-test-token|Bearer/);
+  });
+});
+
 test('sources rotate in order across transient failures', async () => {
   await isolated(async ({ dir }) => {
     const { a, cipher, plain } = fixture();

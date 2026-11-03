@@ -79,12 +79,13 @@ async function fetchAsset(a,output,key,options={}) {
     resetIdle();log('attempt_start');
     let retry=false,stage='fetch';
     try {
-      let url=initial,response;
+      let url=initial,response,visitedGithubApi=false;
       for(let redirects=0;;redirects++) {
         host=url.host;
         if(!token&&isGithubAsset(url)) {const error=new Error('NO_TOKEN_FOR_GITHUB_ASSET');error.retryable=true;throw error;}
         const headers={};
         if(url.origin==='https://api.github.com') {
+          visitedGithubApi=true;
           headers.Accept='application/octet-stream';
           if(token) headers.Authorization=`Bearer ${token}`;
         }
@@ -101,7 +102,7 @@ async function fetchAsset(a,output,key,options={}) {
       if(!response.ok||!response.body) {
         if(response.body) response.body.cancel().catch(()=>{});
         const error=new Error('DOWNLOAD_FAILED');
-        error.retryable=status===408||status===429||status>=500||(initial.origin==='https://api.github.com'&&[401,403,404].includes(status));throw error;
+        error.retryable=status===408||status===429||status>=500||(visitedGithubApi&&[401,403,404].includes(status));throw error;
       }
       const length=response.headers.get('content-length');
       if(length && Number(length)!==a.ciphertextBytes) {response.body.cancel().catch(()=>{});fail('DOWNLOAD_LENGTH');}
