@@ -1,8 +1,7 @@
 name: Windows R1 frozen build and first install acceptance
 'on':
-  push:
-    branches: ['verify-windows-r1-18']
-    paths: ['.github/workflows/windows-r1-build.yml', 'windows-r1/**']
+  # Keep merges to the verify branch from scheduling an unapproved run.
+  workflow_dispatch:
 permissions: {contents: write}
 concurrency: {group: omc-windows-r1-once, cancel-in-progress: false}
 jobs:

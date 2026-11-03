@@ -9,7 +9,14 @@
       "nonceHex": "3c9c0e2668cfeb66dd36f1ad",
       "ciphertextSha256": "cdcbd1e09130b8cdcc9517e2794e93f4beeeb4d39da17dc1e736d2fcdb4e5d94",
       "tagHex": "9731889a5f9f42f3400fa6f8b9b9f27a",
-      "url": "https://omc.xiaoa.cyou/updates/build-inputs/cdcbd1e09130b8cdcc9517e2794e93f4beeeb4d39da17dc1e736d2fcdb4e5d94.windows-r1.enc"
+      "url": "https://omc.xiaoa.cyou/updates/build-inputs/cdcbd1e09130b8cdcc9517e2794e93f4beeeb4d39da17dc1e736d2fcdb4e5d94.windows-r1.enc",
+      "urls": [
+        "https://api.github.com/repos/Siiiiimon123/OMC/releases/assets/704065988",
+        "https://omc.xiaoa.cyou/updates/build-inputs/cdcbd1e09130b8cdcc9517e2794e93f4beeeb4d39da17dc1e736d2fcdb4e5d94.windows-r1.enc"
+      ],
+      "githubReleaseTag": "omc-windows-r1-input-v1",
+      "githubAssetId": 704065988,
+      "githubAssetApiUrl": "https://api.github.com/repos/Siiiiimon123/OMC/releases/assets/704065988"
     }
   ],
   "producerExitCode": 0,

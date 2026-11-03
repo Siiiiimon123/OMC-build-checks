@@ -56,13 +56,16 @@ async function decryptStream(source,a,output,key,onBytes) {
 // attempt and 275 s overall (including backoff). Overrides are for local tests.
 async function fetchAsset(a,output,key,options={}) {
   validate(a); await absent(output);
-  const initial=new URL(a.url);if(initial.protocol!=='https:'||initial.username||initial.password) fail('HTTPS_REQUIRED');
+  const sources=a.urls===undefined?[a.url]:a.urls;
+  if(!Array.isArray(sources)||sources.length===0||sources.some(x=>typeof x!=='string'||!x)) fail('INVALID_MANIFEST');
+  const urls=sources.map(x=>{let url;try{url=new URL(x);}catch{fail('HTTPS_REQUIRED');}if(url.protocol!=='https:'||url.username||url.password) fail('HTTPS_REQUIRED');return url;});
   const {idleTimeoutMs=30000,attemptTimeoutMs=150000,totalTimeoutMs=275000,maxAttempts=3,backoffMs=2000,progressIntervalMs=15000}=options;
   const deadline=Date.now()+totalTimeoutMs;
   let lastError;
   for(let attempt=1;attempt<=maxAttempts;attempt++) {
     const remaining=deadline-Date.now();if(remaining<=0) break;
     const started=Date.now(), controller=new AbortController();
+    const initial=urls[(attempt-1)%urls.length];
     let host=initial.host,status=null,bytes=0,reason=null,source=null,idleTimer;
     const log=(event,why=null)=>process.stderr.write(JSON.stringify({event,attempt,status,bytes,elapsedMs:Date.now()-started,reason:why,host})+'\n');
     const abort=(why)=>{if(reason) return;reason=why;controller.abort();if(source) source.destroy(new Error(why));};
@@ -75,7 +78,13 @@ async function fetchAsset(a,output,key,options={}) {
       let url=initial,response;
       for(let redirects=0;;redirects++) {
         host=url.host;
-        response=await fetch(url,{signal:controller.signal,redirect:'manual'});status=response.status;log('headers');
+        const headers={};
+        if(url.origin==='https://api.github.com') {
+          headers.Accept='application/octet-stream';
+          const token=process.env.GITHUB_TOKEN||process.env.GH_TOKEN;
+          if(token) headers.Authorization=`Bearer ${token}`;
+        }
+        response=await fetch(url,{signal:controller.signal,redirect:'manual',headers});status=response.status;log('headers');
         if([301,302,303,307,308].includes(status)) {
           const location=response.headers.get('location');
           if(response.body) response.body.cancel().catch(()=>{});
@@ -88,7 +97,7 @@ async function fetchAsset(a,output,key,options={}) {
       if(!response.ok||!response.body) {
         if(response.body) response.body.cancel().catch(()=>{});
         const error=new Error('DOWNLOAD_FAILED');
-        error.retryable=status===408||status===429||status>=500;throw error;
+        error.retryable=status===408||status===429||status>=500||(initial.origin==='https://api.github.com'&&[401,403,404].includes(status));throw error;
       }
       const length=response.headers.get('content-length');
       if(length && Number(length)!==a.ciphertextBytes) {response.body.cancel().catch(()=>{});fail('DOWNLOAD_LENGTH');}

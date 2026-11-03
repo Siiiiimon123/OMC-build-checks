@@ -46,15 +46,125 @@ async function isolated(run) {
   const dir = await fsp.mkdtemp(path.join(__dirname, '.transport-test-'));
   const originalFetch = global.fetch;
   const originalWrite = process.stderr.write;
+  const originalGithubToken = process.env.GITHUB_TOKEN;
+  const originalGhToken = process.env.GH_TOKEN;
   const stderr = [];
   process.stderr.write = function(chunk, ...args) { stderr.push(String(chunk)); return true; };
   try { await run({ dir, stderr }); }
   finally {
     global.fetch = originalFetch;
     process.stderr.write = originalWrite;
+    if (originalGithubToken === undefined) delete process.env.GITHUB_TOKEN; else process.env.GITHUB_TOKEN = originalGithubToken;
+    if (originalGhToken === undefined) delete process.env.GH_TOKEN; else process.env.GH_TOKEN = originalGhToken;
     await fsp.rm(dir, { recursive: true, force: true });
   }
 }
+
+for (const githubStatus of [401, 403, 404]) test(`GitHub HTTP ${githubStatus} falls back to CN without leaking Bearer`, async () => {
+  await isolated(async ({ dir, stderr }) => {
+    const { a, cipher, plain } = fixture();
+    a.urls = ['https://api.github.com/repos/example/private/releases/assets/123', 'https://cn.example.test/cipher'];
+    process.env.GITHUB_TOKEN = 'test-token-do-not-log';
+    let calls = 0;
+    global.fetch = async (url, options) => {
+      calls++;
+      if (calls === 1) {
+        assert.equal(url.host, 'api.github.com');
+        assert.equal(options.headers.Accept, 'application/octet-stream');
+        assert.equal(options.headers.Authorization, 'Bearer test-token-do-not-log');
+        return response(githubStatus, null, options.signal);
+      }
+      assert.equal(url.host, 'cn.example.test');
+      assert.equal(options.headers.Authorization, undefined);
+      return response(200, cipher, options.signal);
+    };
+    await fetchAsset(a, path.join(dir, 'out'), key, timings);
+    assert.equal(calls, 2);
+    assert.deepEqual(await fsp.readFile(path.join(dir, 'out')), plain);
+    assert.ok(entries(stderr).some(x => x.host === 'api.github.com' && x.status === githubStatus && x.reason === 'HTTP_RETRYABLE'));
+    assert.ok(entries(stderr).some(x => x.host === 'cn.example.test' && x.reason === 'SUCCESS'));
+    assert.doesNotMatch(stderr.join(''), /test-token-do-not-log|Bearer/);
+  });
+});
+
+test('sources rotate in order across transient failures', async () => {
+  await isolated(async ({ dir }) => {
+    const { a, cipher, plain } = fixture();
+    a.urls = ['https://api.github.com/repos/example/private/releases/assets/123', 'https://cn.example.test/cipher'];
+    const hosts = [];
+    global.fetch = async (url, options) => {
+      hosts.push(url.host);
+      return hosts.length < 3 ? response(503, null, options.signal) : response(200, cipher, options.signal);
+    };
+    await fetchAsset(a, path.join(dir, 'out'), key, timings);
+    assert.deepEqual(hosts, ['api.github.com', 'cn.example.test', 'api.github.com']);
+    assert.deepEqual(await fsp.readFile(path.join(dir, 'out')), plain);
+  });
+});
+
+test('GitHub token is not forwarded to a redirected host', async () => {
+  await isolated(async ({ dir, stderr }) => {
+    const { a, cipher } = fixture();
+    a.urls = ['https://api.github.com/repos/example/private/releases/assets/123'];
+    delete process.env.GITHUB_TOKEN;
+    process.env.GH_TOKEN = 'second-test-token';
+    let calls = 0;
+    global.fetch = async (url, options) => {
+      calls++;
+      if (calls === 1) {
+        assert.equal(options.headers.Authorization, 'Bearer second-test-token');
+        return { status: 302, ok: false, body: null, headers: new Headers({ location: 'https://assets.example.test/download' }) };
+      }
+      assert.equal(url.host, 'assets.example.test');
+      assert.equal(options.headers.Authorization, undefined);
+      return response(200, cipher, options.signal);
+    };
+    await fetchAsset(a, path.join(dir, 'out'), key, timings);
+    assert.equal(calls, 2);
+    assert.doesNotMatch(stderr.join(''), /second-test-token|Bearer/);
+  });
+});
+
+test('GitHub redirect to an unavailable CDN falls back to CN without forwarding the token', async () => {
+  await isolated(async ({ dir, stderr }) => {
+    const { a, cipher, plain } = fixture();
+    a.urls = ['https://api.github.com/repos/example/private/releases/assets/123', 'https://cn.example.test/cipher'];
+    process.env.GITHUB_TOKEN = 'redirect-test-token';
+    let calls = 0;
+    global.fetch = async (url, options) => {
+      calls++;
+      if (calls === 1) {
+        assert.equal(options.headers.Authorization, 'Bearer redirect-test-token');
+        return { status: 302, ok: false, body: null, headers: new Headers({ location: 'https://release-assets.githubusercontent.com/download' }) };
+      }
+      assert.equal(options.headers.Authorization, undefined);
+      if (calls === 2) {
+        assert.equal(url.host, 'release-assets.githubusercontent.com');
+        return response(403, null, options.signal);
+      }
+      assert.equal(url.host, 'cn.example.test');
+      return response(200, cipher, options.signal);
+    };
+    await fetchAsset(a, path.join(dir, 'out'), key, timings);
+    assert.equal(calls, 3);
+    assert.deepEqual(await fsp.readFile(path.join(dir, 'out')), plain);
+    assert.ok(entries(stderr).some(x => x.host === 'release-assets.githubusercontent.com' && x.status === 403 && x.reason === 'HTTP_RETRYABLE'));
+    assert.doesNotMatch(stderr.join(''), /redirect-test-token|Bearer/);
+  });
+});
+
+test('corrupted preferred source fails authentication without trying the fallback', async () => {
+  await isolated(async ({ dir }) => {
+    const { a, cipher } = fixture();
+    a.urls = ['https://api.github.com/repos/example/private/releases/assets/123', 'https://cn.example.test/cipher'];
+    const bad = Buffer.from(cipher); bad[0] ^= 1;
+    let calls = 0;
+    global.fetch = async (_url, options) => { calls++; return response(200, bad, options.signal); };
+    await assert.rejects(fetchAsset(a, path.join(dir, 'out'), key, timings));
+    assert.equal(calls, 1);
+    assert.deepEqual(await fsp.readdir(dir), []);
+  });
+});
 
 function entries(stderr) {
   return stderr.join('').trim().split('\n').filter(Boolean).map(line => JSON.parse(line));
