@@ -52,6 +52,9 @@ async function runInspector(options = {}) {
   let startButtonPolls = 0;
   let startClicks = 0;
   let restoreViewPolls = 0;
+  let rootPolls = 0;
+  let rootMeasurements = 0;
+  const value = (key, fallback) => Object.hasOwn(options, key) ? options[key] : fallback;
   let fakeNow = Date.now();
   class FakeDate extends Date { static now() { return fakeNow; } }
   let importClicks = 0;
@@ -66,7 +69,7 @@ async function runInspector(options = {}) {
     innerText: b.label, getAttribute(name) { return name === 'aria-label' ? this.label : null; } }));
   class FakeElement {}
   const root = Object.assign(new FakeElement(), { childElementCount: 1, innerText: 'x'.repeat(560),
-    getBoundingClientRect: () => ({ width: 1008, height: 655 }) });
+    getBoundingClientRect: () => { rootMeasurements++; return { width: options.rootNeverReady || rootPolls < (options.rootAfter || 1) || (options.rootRegresses && rootMeasurements === 2) ? 100 : 1008, height: 655 }; } });
   root.self = root;
   const document = {
     readyState: 'complete',
@@ -95,7 +98,7 @@ async function runInspector(options = {}) {
       throw Error(`Unexpected selector: ${selector}`);
     },
     querySelector(selector) {
-      if (selector === '#root') return root;
+      if (selector === '#root') { rootPolls++; return root; }
       if (selector === 'input[type=file]') {
         inputPolls++;
         return imported && inputPolls >= (options.inputAfter || 1) ? {} : null;
@@ -106,10 +109,10 @@ async function runInspector(options = {}) {
         restoreViewPolls++;
         const restored = !options.delayRestore || restoreViewPolls >= 4;
         return Object.assign(new FakeElement(), { dataset: {
-          decision: restored && kept ? 'keep' : '', reviewPhotoId: restored ? 'p1' : ''
+          decision: restored && kept ? 'keep' : '', reviewPhotoId: restored ? value('restoredPhotoId', 'p1') : ''
         } });
       }
-      if (selector === '.single-filename') return { innerText: fixture };
+      if (selector === '.single-filename') return { innerText: value('restoredFileName', fixture) };
       if (selector === '.decision.accept') return { disabled: false, click() { kept = true; } };
       throw Error(`Unexpected selector: ${selector}`);
     }
@@ -172,7 +175,7 @@ async function runInspector(options = {}) {
     readFileSync(file) {
       if (/DevToolsActivePort$/.test(file)) return '1234\n';
       if (file === fixture) return Buffer.from('synthetic fixture');
-      if (file === 'snapshot.json') return JSON.stringify({ sentinel: 'sentinel', state: { photoId: 'p1', fileName: fixture, decision: 'keep' } });
+      if (file === 'snapshot.json') return JSON.stringify({ sentinel: 'sentinel', state: { photoId: value('seedPhotoId', 'p1'), fileName: value('seedFileName', fixture), decision: 'keep' } });
       throw Error(`Unexpected read: ${file}`);
     },
     existsSync(file) { assert.equal(file, fixture); return options.fixtureExists !== false; },
@@ -203,7 +206,7 @@ async function runInspector(options = {}) {
     "await call('Runtime.enable');", `await call('Runtime.enable');await evaluate(${JSON.stringify(options.injectExpression)});`
   );
   await vm.runInContext(script, context);
-  return { report: JSON.parse(writes.get(output)), events, writes, sites, serializationErrors, rendererExceptions, inputPolls, importButtonPolls, importClicks, startButtonPolls, startClicks, restoreViewPolls, exitCode: fakeProcess.exitCode };
+  return { report: JSON.parse(writes.get(output)), events, writes, sites, serializationErrors, rendererExceptions, inputPolls, importButtonPolls, importClicks, startButtonPolls, startClicks, restoreViewPolls, rootPolls, exitCode: fakeProcess.exitCode };
 }
 
 test('CDP error exposes method, bounded error details and seed stage', async () => {
@@ -238,6 +241,38 @@ test('waits for restored photo identity and decision after single-view node appe
   assert.ok(restoreViewPolls >= 4);
   assert.equal(report.restored.photoId, 'p1');
   assert.equal(report.restored.decision, 'keep');
+});
+
+test('restore rejects empty, missing, null and whitespace identity on either side', async () => {
+  for (const options of [
+    { seedPhotoId: '', restoredPhotoId: '' }, { seedFileName: '', restoredFileName: '' },
+    { seedPhotoId: '' }, { restoredPhotoId: '' }, { seedFileName: '' }, { restoredFileName: '' },
+    { seedPhotoId: null }, { seedPhotoId: undefined }, { restoredPhotoId: null },
+    { restoredFileName: undefined }, { seedFileName: '   ' }, { restoredPhotoId: '  ' }
+  ]) {
+    const { report } = await runInspector({ mode: '--restore', ...options });
+    assert.equal(report.status, 'FAIL', JSON.stringify(options));
+    assert.equal(report.failureCode, 'REAL16_PHOTO_IDENTITY_EMPTY', JSON.stringify(options));
+  }
+});
+
+test('restore rejects non-empty identity mismatches and accepts a real match', async () => {
+  for (const options of [{ restoredPhotoId: 'other' }, { restoredFileName: 'other.jpg' }]) {
+    const { report } = await runInspector({ mode: '--restore', ...options });
+    assert.equal(report.failureCode, 'REAL16_PROJECT_OR_DECISION_NOT_RESTORED');
+  }
+  const { report } = await runInspector({ mode: '--restore' });
+  assert.equal(report.status, 'PASS_REAL16_TO18_PROJECT_KEEP_FULL_AI', JSON.stringify(report));
+});
+
+test('waits for root completeness and fails with the existing code after timeout', async () => {
+  const delayed = await runInspector({ rootAfter: 8 });
+  assert.equal(delayed.report.status, 'PASS_REAL16_SYNTHETIC_IMPORT_KEEP_AND_SENTINEL', JSON.stringify(delayed.report));
+  assert.ok(delayed.rootPolls >= 8);
+  const regressed = await runInspector({ rootRegresses: true });
+  assert.equal(regressed.report.status, 'PASS_REAL16_SYNTHETIC_IMPORT_KEEP_AND_SENTINEL', JSON.stringify(regressed.report));
+  const timedOut = await runInspector({ rootNeverReady: true });
+  assert.equal(timedOut.report.failureCode, 'REAL_ROOT_BLANK_OR_INVALID');
 });
 
 test('accepts a synchronous beginAiAnalysis result as well as a promise', async () => {
