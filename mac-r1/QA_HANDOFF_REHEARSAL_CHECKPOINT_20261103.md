@@ -23,3 +23,7 @@ The controller's wait is bounded by the earlier of 900 seconds after it starts w
 The real ancestry-package relay, signing, QA staging and HTTPS readiness readback completed, but **the rehearsal failed the timing gate**: the recorded end-to-end wall-clock duration was 1027.812 seconds, with a margin of −127.812 seconds against 900 seconds. Relay alone was reported at 987.532 seconds. The timer did not capture a monotonic start, and a clock adjustment was not independently ruled out; this is a limitation of the timing evidence. The authenticated rehearsal PKG SHA-256 is `c2c7c2eb0a4f647f41c4f066a0b362e564911a1f556b1d7b99288d57f9555dde`; it is not the new Mac-run package.
 
 The formal metadata regular-file hashes compared equal before and after the rehearsal. The rehearsal nonce was archived with matching file hashes; the fixed candidate nonce was recreated empty and its READY URL returned 404. Evidence is in local prep `REHEARSAL_RESULT.json`, `REHEARSAL_RELAY_PROOF.json`, `REHEARSAL_STAGE_RECEIPT.json`, `NONCE_TRANSITION.json` and `codex-qa-rehearsal-r2.stderr.txt`. The preflight must be rerun against the completed evidence and must remain blocked by the failed timing gate. No candidate push, dispatch, merge or Mac cloud run occurred.
+
+## Final preflight rerun
+
+`PREFLIGHT_RESULT_MAC_LAST.json`: static and controller checks PASS; QA handoff FAIL because rehearsal took 1027.812 seconds; Darwin package/install checks SKIP on Windows. Overall FAIL and `PUSH_READY.readyToPush=false`. No candidate push or Mac cloud run occurred.
