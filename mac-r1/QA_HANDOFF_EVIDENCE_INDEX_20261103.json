@@ -1,0 +1,137 @@
+{
+  "schema": "omc-mac-qa-rehearsal-evidence-index-v1",
+  "purpose": "Public-safe evidence index; scripts remain on the preparation machine; this is not runnable source.",
+  "records": {
+    "REHEARSAL_RESULT.json": {
+      "sha256": "63ce5a52b1998a920d51b2d3c57095fe2860e349abc7ecae1e41a3467364d60c",
+      "summary": {
+        "status": "FAIL",
+        "scope": "REHEARSAL_ANCESTRY_41274803807",
+        "e2eSeconds": 1027.812,
+        "marginSeconds": -127.812,
+        "packageSha256": "c2c7c2eb0a4f647f41c4f066a0b362e564911a1f556b1d7b99288d57f9555dde",
+        "httpsStatus": 200,
+        "productionFeedUntouched": true,
+        "feedsModified": false,
+        "formalUrlServingTested": false,
+        "metadataVersion": 10,
+        "timingBasis": "wall clock; monotonic start not captured; clock adjustment not independently ruled out",
+        "reason": "TIME_BUDGET_EXCEEDED_OR_INVALID"
+      }
+    },
+    "REHEARSAL_RELAY_PROOF.json": {
+      "sha256": "e7a2e825198b25e72ea07a5b8922af8668f9ee34d0940807be443bd154e5d186",
+      "summary": {
+        "schema": "omc-rehearsal-authenticated-remote-artifact-v1",
+        "status": "REHEARSAL_PASS_AUTHENTICATED_REMOTE_ARTIFACT",
+        "rehearsal": true,
+        "sourceRun": 41274803807,
+        "bytes": 1156076139,
+        "sha256": "c2c7c2eb0a4f647f41c4f066a0b362e564911a1f556b1d7b99288d57f9555dde",
+        "magicHex": "78617221",
+        "producerGCMauthenticated": true,
+        "privateOnly": true,
+        "memberFeedChanged": false
+      }
+    },
+    "REHEARSAL_STAGE_RECEIPT.json": {
+      "sha256": "8a2f56fe69630de6b19dc6418e2add8820310ae3c084cb693b348a5bf668b5be",
+      "summary": {
+        "schema": "omc-qa-metadata-stage-receipt-v1",
+        "status": "REHEARSAL_PASS_QA_STAGE_NOT_FORMAL_FEED",
+        "rehearsal": true,
+        "packageSha256": "c2c7c2eb0a4f647f41c4f066a0b362e564911a1f556b1d7b99288d57f9555dde",
+        "readyWrittenLast": true,
+        "feedsModified": false,
+        "formalUrlServingTested": false
+      }
+    },
+    "NONCE_TRANSITION.json": {
+      "sha256": "4602e95f39eee6311f22ba8a2f12296f53609e09bcca72a017663aaa9a95a101",
+      "summary": {
+        "status": "PASS",
+        "rehearsalPackageSha256": "c2c7c2eb0a4f647f41c4f066a0b362e564911a1f556b1d7b99288d57f9555dde",
+        "candidateEmpty": true,
+        "readyHttpStatus": 404
+      }
+    },
+    "PREFLIGHT_RESULT_MAC_LAST.json": {
+      "sha256": "c5a6a6a12e416087d02f8ae2d5ff0840198af884b9d415a0a879909209c26ceb",
+      "summary": {
+        "status": "FAIL",
+        "localHeadSha": "245565e12321a87782ece85d9b9c59e9c09bc678",
+        "cases": [
+          {
+            "name": "git_blob_and_hash_chain",
+            "status": "PASS"
+          },
+          {
+            "name": "authorization_and_workflow",
+            "status": "PASS"
+          },
+          {
+            "name": "isolated_clean_commit",
+            "status": "PASS"
+          },
+          {
+            "name": "private_zip_scope_binding_and_source",
+            "status": "PASS"
+          },
+          {
+            "name": "asset_get_and_authenticated_decrypt",
+            "status": "PASS"
+          },
+          {
+            "name": "controller_pre_secret_gate",
+            "status": "PASS"
+          },
+          {
+            "name": "syntax_evidence_and_recorded_dynamic_tests",
+            "status": "PASS"
+          },
+          {
+            "name": "qa_feed_runtime_handoff_ready",
+            "status": "FAIL"
+          },
+          {
+            "name": "darwin_pkg_contract_and_install",
+            "status": "SKIP"
+          }
+        ]
+      }
+    },
+    "PUSH_READY.json": {
+      "sha256": "ec5ecf1268ecfad6197df098c366e8e6f7a79aa4efcf6814930a7c371865e05e",
+      "summary": {
+        "readyToPush": false,
+        "reason": "HOLD_QA_FEED_RUNTIME_HANDOFF_NOT_VERIFIED",
+        "localHeadSha": "245565e12321a87782ece85d9b9c59e9c09bc678",
+        "preflightOverall": "FAIL",
+        "darwinNativeValidation": "SKIPPED_WINDOWS_HOST",
+        "rehearsalStatus": "FAIL_TIME_BUDGET",
+        "handoffExecutorReady": false,
+        "verifyPushPerformed": false,
+        "workflowDispatchPerformed": false,
+        "githubMergePerformed": false
+      }
+    }
+  },
+  "prepScriptSha256": {
+    "HANDOFF_EXECUTOR.py": "1bf0c66895af41c92ba3afa6b7638b6d36a895eb0a7c088ead302d21df36f159",
+    "qa_handoff_preflight.py": "7f1208d2bdd17119a55c19738a5288720347864bba8e13687a5f25eec7c70600"
+  },
+  "toolScriptSha256": {
+    "artifact-relay/relay.cjs": "71425cb5a3ce8fa3e9ba56c27751719bddfe30a5c0c9929d891831377e9b4a87",
+    "artifact-relay/receiver.cjs": "40d04863d7c814772539a24590a0b228a6e9429d049d6316b7b6f0f4bdca02ba",
+    "artifact-relay/https-producer.cjs": "3dc6e0e8de1466ce7e67a61d79db2cfb30842bd14c8c8d397597bd472df2df5f",
+    "signed-update18/publish-reference-mac.cjs": "ee3432de02fdc70cb4b0ada52abf0658b6408a135919fe4cf8239a95fd7a1fda",
+    "signed-update18/artifact-reference.cjs": "6a2c27ef350a31a3017beddcd2494ab67c193f0df46447b11a5b9204ed86e2af",
+    "signed-update18/seed-tools/read-live-seed.cjs": "8ed02ae33da5be8e77cde394f3c011f88f8e5934480a53f807464a7f431ca3b7",
+    "metadata-stage/preserved-seed.cjs": "88f5ffd9e41367ad0d7145cbdc810f8eb3e5c40957853211c2f6cf173855b568",
+    "metadata-stage/stage.cjs": "903164525fe8d2a90372d50c5f4a8793035f2d42fdcff45608f1e2155b00ab7c",
+    "metadata-stage/remote.py": "d7d33817b5a8c749e9d378bbdc0077f720f9232f79a3af77352e02f501aa2e82"
+  },
+  "macCandidatePushPerformed": false,
+  "workflowDispatchPerformed": false,
+  "macCloudRunStarted": false
+}
