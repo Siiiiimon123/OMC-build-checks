@@ -25,8 +25,8 @@ jobs:
         env:
           OMC_PREVIEW15_TRANSPORT_KEY: '${{ secrets.OMC_PREVIEW15_TRANSPORT_KEY }}'
           GH_TOKEN: '${{ github.token }}'
-          OMC_MAC_R1_AUTHORIZATION_ID: 'user-r1-completion-20261102'
+          OMC_MAC_R1_AUTHORIZATION_ID: 'user-mac-last-20261103-1727'
         run: |
           set +x
           umask 077
-          python mac-r1/final/run.py --execute --config mac-r1/final/CONFIG.json --config-sha256 0d4d6c0c91f98438b47388c4e68bcd78201c57aa7d0cc46da2af967f6cbf6f37
+          python mac-r1/final/run.py --execute --config mac-r1/final/CONFIG.json --config-sha256 205e5c0cea3e151fa7fc531edcecaa7ba5e8c4e466f8e0142a67cc17ead945a2

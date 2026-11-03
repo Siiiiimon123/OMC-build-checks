@@ -24,9 +24,9 @@ def main():
     if not a.execute:print(json.dumps({'status':'PREPARED_DISABLED_NO_NETWORK_APP_OR_KEY','stages':['parallel released17 download','authenticate native72 PKG+source delta','frontend-only build','new18 install/JPEG DOM/fullAI/normal exit','early encrypted PKG+reports publication','real17->18 installer data preservation','<=15min QA_READY','controlled real update button+target+Installer','final encrypted reports'],'nativeExecutionVerified':False}));return
     assert sys.platform=='darwin' and platform.machine()=='arm64' and os.environ.get('GITHUB_ACTIONS')=='true'
     assert os.environ.get('GITHUB_REPOSITORY')==REPO and os.environ.get('GITHUB_REF')=='refs/heads/verify-mac-r1-18' and os.environ.get('GITHUB_RUN_ATTEMPT')=='1'
-    assert sha(a.config)==a.config_sha256;cfg=json.loads(Path(a.config).read_bytes());assert cfg['executeAuthorized'] is True and cfg['rootReviewedController'] is True and cfg['macRunsUsedBeforeThis']==3 and cfg['maxMacRuns']==5 and cfg['maxSeconds']==3600 and cfg['feeUSD']==0 and cfg['sourceTreeWindows']==WIN and cfg['sourceTreeMac']==MAC and cfg['backendBuiltFromMacTree']==NATIVE
-    assert os.environ.get('OMC_MAC_R1_AUTHORIZATION_ID')=='user-r1-completion-20261102' and cfg['completionAuthorizationId']=='call_111cc30030174d1abab39266e9dd9b9a'
-    assert cfg['additionalMacRunsApproved']==2 and cfg['additionalMacSecondsCombined']==5400 and cfg['additionalMacRunOrdinal']==1 and cfg['reservedAdditionalSecondsForManualSecondRun']==1800 and cfg['maxSeconds']+cfg['reservedAdditionalSecondsForManualSecondRun']==cfg['additionalMacSecondsCombined'] and cfg['automaticRerun'] is False and cfg['stopOnSuccess'] is True
+    assert sha(a.config)==a.config_sha256;cfg=json.loads(Path(a.config).read_bytes());assert cfg['executeAuthorized'] is True and cfg['rootReviewedController'] is True and cfg['macRunsUsedBeforeThis']==4 and cfg['maxMacRuns']==5 and cfg['maxSeconds']==3600 and cfg['feeUSD']==0 and cfg['sourceTreeWindows']==WIN and cfg['sourceTreeMac']==MAC and cfg['backendBuiltFromMacTree']==NATIVE
+    assert os.environ.get('OMC_MAC_R1_AUTHORIZATION_ID')=='user-mac-last-20261103-1727' and cfg['completionAuthorizationId']=='user-mac-last-20261103-1727' and cfg['approvalTimestamp']=='2026-11-03T17:27:00+08:00' and cfg['approvedRunsThisAuthorization']==1
+    assert cfg['additionalMacRunsApproved']==2 and cfg['additionalMacRunOrdinal']==2 and cfg['priorAdditionalMacSecondsCombined']==5400 and cfg['priorReservedAdditionalSecondsForManualSecondRun']==1800 and cfg['automaticRerun'] is False and cfg['stopOnSuccess'] is True
     here=Path(__file__).resolve().parent;tools=(here/cfg['genericToolsRelative']).resolve();assert tools.is_relative_to(here.parent.parent.resolve())
     route=cfg['qaRoute'];qa=urllib.parse.urlparse(route['qaMetadataPrefix']);assert route['formalMetadataPrefix']=='https://omc.xiaoa.cyou/updates/metadata/' and qa.scheme=='https' and qa.hostname=='omc.xiaoa.cyou' and qa.port in (None,443) and not qa.username and not qa.password and not qa.query and not qa.fragment and re.fullmatch(r'/updates/qa-r1/[A-Za-z0-9_-]{16,96}/',qa.path)
     assert cfg['readyUrl']==route['qaMetadataPrefix']+'QA_READY.json'
@@ -79,7 +79,7 @@ def main():
                 try:p.wait(timeout=5)
                 except subprocess.TimeoutExpired:failure='OWNED_TREE_DID_NOT_EXIT'
             thread.join(timeout=5)
-        report['steps'].append({'label':label,'exitCode':p.returncode,'failure':failure,'logCappedBytes':262144});checkpoint()
+        report['steps'].append({'label':label,'argv':[str(x) for x in args],'cwd':str(cwd) if cwd else None,'environmentKeys':sorted((env or clean).keys()),'exitCode':p.returncode,'failure':failure,'logCappedBytes':262144});checkpoint()
         if failure or p.returncode:raise RuntimeError(label+':'+str(failure or 'EXIT_NONZERO'))
     def report_tar(name):
         target=work/(name+'.tar');total=0
@@ -133,7 +133,7 @@ def main():
         run('git-source-record',['git','-c','user.name=OMC QA','-c','user.email=qa@invalid.local','commit','--quiet','-m','Authenticated exact Mac source'],cwd=source)
         approval=work/'NATIVE_STAGE_APPROVAL.json';save(approval,{'executeAuthorized':True,'frontendSourceTreeMac':MAC,'bindingSha256':cfg['bindingSha256']})
         run('reuse-native-build',[sys.executable,final/'harness/reuse-native-stage.py','--execute','--base-pkg',work/'native72.pkg','--source',source,'--binding',final/'COMPOSITE_BINDING.json','--manifest',final/'SOURCE_MANIFEST_MAC_FINAL.json','--tools',tools,'--work',work/'frontend-stage','--approval',approval],seconds=1500)
-        built=json.loads((work/'frontend-stage/reports/COMPOSITE_BUILD_RESULT.json').read_bytes());package=Path(built['package']['path']);assert sha(package)==built['package']['sha256'];report['newPackage']=built['package'];report['newAsarSha256']=built['asarSha256'];checkpoint()
+        built=json.loads((work/'frontend-stage/reports/COMPOSITE_BUILD_RESULT.json').read_bytes());package=Path(built['package']['path']);assert sha(package)==built['package']['sha256'];report['newPackage']=built['package'];report['newAsarSha256']=built['asarSha256'];report['packagingCommands']=built.get('packagingCommands',[]);checkpoint()
         # Disposable runner only: verified package readback and generated build App
         # yield to the one installed App; preserve receipts and the distinct PKG.
         import shutil
@@ -144,6 +144,16 @@ def main():
             shutil.rmtree(candidate);reclaimed.append(relative)
         report['generatedPackageReadbackAndBuildAppReclaimedBeforeInstall']=reclaimed;checkpoint()
         run('install-new18',['sudo','-n','/usr/sbin/installer','-pkg',package,'-target','/'],seconds=300)
+        installed_report=reports/'MAC_INSTALLED_APP_EVIDENCE.json'
+        try:
+            run('verify-installed-mac-app',['node',final/'harness/verify-installed-mac-app.cjs','/Applications/OMC-Preview.app',built['asarSha256'],installed_report],seconds=120,env={**clean,'NODE_PATH':str(source/'node_modules')})
+        finally:
+            if installed_report.is_file():
+                report['macInstalledAppEvidence']=json.loads(installed_report.read_bytes())
+            else:
+                report['macInstalledAppEvidence']={'status':'FAIL','missingEvidence':['installed Resources inventory','installed app.asar SHA256','Info.plist bytes and SHA256','ElectronAsarIntegrity header comparison']}
+            checkpoint()
+        if report['macInstalledAppEvidence'].get('status')!='PASS':raise RuntimeError('INSTALLED_MAC_APP_EVIDENCE_FAILED')
         run('generate-native-fixtures',['node',final/'harness/generate-fixtures.mjs','--execute',work/'generated-jpeg'],seconds=120)
         run('new18-real-jpeg-dom',['node',final/'harness/jpeg-dom-final.mjs','--execute','/Applications/OMC-Preview.app',work/'generated-jpeg/FIXTURES.json',work/'jpeg-dom-result',source,final/'COMPOSITE_BINDING.json'],seconds=1000)
         fixture=work/'generated-jpeg/FRAME0000.JPG';run('new18-normal-full-ai',['node',final/'harness/normal-ai-regression.mjs','/Applications/OMC-Preview.app',reports/'NEW_NORMAL_AI.json',fixture],seconds=360)

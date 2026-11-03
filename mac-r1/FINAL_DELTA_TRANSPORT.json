@@ -3,13 +3,13 @@
   "assets": [
     {
       "id": "final",
-      "plaintextBytes": 2872403,
-      "plaintextSha256": "aadd88a262bf3fc81b4f0a5ec99fe2a8d00fbacac4b5b4fa1e27adde6df3aa93",
-      "ciphertextBytes": 2872403,
-      "nonceHex": "d6b4317206287035156fef68",
-      "ciphertextSha256": "4c62f2446181b387175b7dca46b75030c9511b2eca2b0af66158808fe2d40408",
-      "tagHex": "895ff4baacc6240a912bc3f08da0baab",
-      "url": "https://omc.xiaoa.cyou/updates/build-inputs/4c62f2446181b387175b7dca46b75030c9511b2eca2b0af66158808fe2d40408.mac-diagnostics.enc"
+      "plaintextBytes": 2870590,
+      "plaintextSha256": "6eccacd64d50da3e0963a95062c44f6c4b711ade1586d2f168759ff52c399191",
+      "ciphertextBytes": 2870590,
+      "nonceHex": "99845666d9e9764cf1abfaf5",
+      "ciphertextSha256": "e902c94ce5e3381f7afd2ce7dae89c5dae998ebb101743d95a7fe9bdd175cc5c",
+      "tagHex": "4241042b1526fcfaedf363893aebaec2",
+      "url": "https://omc.xiaoa.cyou/updates/build-inputs/e902c94ce5e3381f7afd2ce7dae89c5dae998ebb101743d95a7fe9bdd175cc5c.mac-last.enc"
     }
   ]
 }
