@@ -4,7 +4,7 @@
   "repository": "Siiiiimon123/OMC-build-checks",
   "limits": {
     "feeUSD": 0,
-    "windowsRuns": 12,
+    "windowsRuns": 13,
     "windowsMinutesEach": 60,
     "macRuns": 2,
     "macMinutesEach": 90,
@@ -16,7 +16,7 @@
   "sourceTreeMac": "42a64bd6e221d12cad35f0bd8e7d85ee89237e6a",
   "backendBuiltFromMacTree": "126976cbb5e25f01bc1763294ba6a75800bc5f99",
   "executed": {
-    "windows": 11,
+    "windows": 12,
     "mac": 1
   },
   "remaining": {
@@ -190,6 +190,23 @@
     "macUntouched": true,
     "mainUntouched": true,
     "note": "windowsRuns 11->12; one twelfth Windows cloud acceptance on verify-windows-r1-18; product fe8de64 / tree cb0aaee04d7a99e4b175e2b8b039a23afec85006; cipher cdcbd1e0; no Mac/main; no mirror token required; PR #3 locally merged and push trigger restored.",
+    "productCommit": "fe8de6465724436b45c8208db3284c5d2f143a7c",
+    "productTree": "cb0aaee04d7a99e4b175e2b8b039a23afec85006",
+    "cloudDispatchAuthorized": true
+  },
+  "windowsThirteenthSupplementalApproval": {
+    "approvedAtAsiaShanghai": "2026-11-03T13:28:00+08:00",
+    "verbatim": "批准第十三次 Windows 验收：先修好照片编号为空也算通过的漏洞，合并 PR #4 和批准一起推送，预检通过就启动",
+    "additionalRuns": 1,
+    "maximumTotalRuns": 13,
+    "minutesEach": 60,
+    "feeUSD": 0,
+    "automaticRerun": false,
+    "stopOnSuccess": true,
+    "standardPublicRunnerOnly": true,
+    "macUntouched": true,
+    "mainUntouched": true,
+    "note": "windowsRuns 12->13; one thirteenth Windows cloud acceptance on verify-windows-r1-18; product fe8de64 / tree cb0aaee04d7a99e4b175e2b8b039a23afec85006; cipher cdcbd1e0; no Mac/main; PR #4 locally merged.",
     "productCommit": "fe8de6465724436b45c8208db3284c5d2f143a7c",
     "productTree": "cb0aaee04d7a99e4b175e2b8b039a23afec85006",
     "cloudDispatchAuthorized": true
