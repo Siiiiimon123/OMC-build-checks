@@ -20,7 +20,7 @@ jobs:
       - name: Build and verify self-contained installed app
         env:
           OMC_PREVIEW15_TRANSPORT_KEY: '${{ secrets.OMC_PREVIEW15_TRANSPORT_KEY }}'
-          GH_TOKEN: '${{ github.token }}'
+          GH_TOKEN: '${{ secrets.OMC_PRIVATE_MIRROR_TOKEN || github.token }}'
           OMC_R1_AUTHORIZATION_ID: 'user-r1-execution-20261101'
           PYTHONDONTWRITEBYTECODE: '1'
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'

@@ -75,7 +75,7 @@ def main():
   print(json.dumps({'phase':'gate-only-pass','controller':'run-cloud.py','scopeSha':SCOPE_SHA,'sourceTree':SOURCE,'windowsRuns':scope['limits']['windowsRuns'],'executedWindows':scope['executed']['windows'],'remainingWindows':scope['remaining']['windows'],'tenthApprovedAt':scope['windowsTenthSupplementalApproval']['approvedAtAsiaShanghai'],'cloudDispatchAuthorized':scope['windowsTenthSupplementalApproval']['cloudDispatchAuthorized']}),flush=True)
   return
  key=os.environ.pop('OMC_PREVIEW15_TRANSPORT_KEY');token=os.environ.pop('GH_TOKEN');assert len(key)==64
- clean=dict(os.environ);secret={**clean,'OMC_PREVIEW15_TRANSPORT_KEY':key}
+ clean=dict(os.environ);secret={**clean,'OMC_PREVIEW15_TRANSPORT_KEY':key,'GH_TOKEN':token,'GITHUB_TOKEN':token}
  temp=Path(os.environ['RUNNER_TEMP']).resolve();work=temp/'omc-r1-controller';assert not work.exists();work.mkdir()
  assert shutil.disk_usage(work).free>12*1024**3
  detail=work/'reports';detail.mkdir();out=work/'encrypted';out.mkdir();helper=here/'transport.cjs';package=None;status=1
