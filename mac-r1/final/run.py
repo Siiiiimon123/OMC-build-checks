@@ -1,15 +1,30 @@
 """Prepared generic Mac2 controller. No network/App/key access without --execute.
 Only disposable exact public-repo branch/run-attempt1; Root owns all readiness/feed.
 """
-import argparse, hashlib, json, os, platform, re, signal, subprocess, sys, tarfile, threading, time, urllib.parse, urllib.request, zipfile
+import argparse, hashlib, json, math, os, platform, re, signal, subprocess, sys, tarfile, threading, time, urllib.parse, urllib.request, zipfile
 from pathlib import Path, PurePosixPath
 from publication_helpers import publish
+if not __debug__: raise RuntimeError('PYTHON_OPTIMIZATION_FORBIDDEN')
 REPO='Siiiiimon123/OMC-build-checks';WIN='7fd90440ad51eb7abdf3407b6a25f09ca49a8604';MAC='42a64bd6e221d12cad35f0bd8e7d85ee89237e6a';NATIVE='126976cbb5e25f01bc1763294ba6a75800bc5f99'
 OLD_SHA='6400fe0d915dc0cd68a727772d7e66f9c168ef0d558e706caf40a71e0f9b00cc'
 def sha(p):
     with Path(p).open('rb') as f:return hashlib.file_digest(f,'sha256').hexdigest()
 def save(p,obj):Path(p).write_text(json.dumps(obj,indent=2)+'\n',encoding='utf-8')
 def phase(p):print(json.dumps({'phase':p}),flush=True)
+def await_qa_ready(url,until,package_sha):
+    while True:
+        remaining=until-time.monotonic()
+        if remaining<=0:return False
+        try:
+            with urllib.request.urlopen(url,timeout=min(20,remaining)) as r:
+                assert r.url==url;body=r.read(16385);assert len(body)<=16384;value=json.loads(body)
+            if time.monotonic()>=until:return False
+            issued=value.get('readyIssuedMonotonic');remote_deadline=value.get('serverDeadlineMonotonic')
+            if value.get('ready') is True and value.get('sourceTreeMac')==MAC and value.get('packageSha256')==package_sha and type(issued) in (int,float) and type(remote_deadline) in (int,float) and math.isfinite(issued) and math.isfinite(remote_deadline) and 0<issued<remote_deadline:return True
+        except (OSError,ValueError):pass
+        remaining=until-time.monotonic()
+        if remaining<=0:return False
+        time.sleep(min(10,remaining))
 def safe_zip(archive,dest):
     with zipfile.ZipFile(archive) as z:
         entries=z.infolist();assert 1<=len(entries)<=1200 and len({x.filename for x in entries})==len(entries);assert sum(x.file_size for x in entries)<=16*1024*1024
@@ -162,15 +177,8 @@ def main():
         route=cfg['qaRoute'];ready=urllib.parse.urlparse(cfg['readyUrl']);assert ready.scheme=='https' and ready.hostname=='omc.xiaoa.cyou' and ready.port in (None,443) and cfg['readyUrl'].startswith(route['qaMetadataPrefix']) and not ready.username and not ready.password and not ready.query and not ready.fragment
         route_file=work/'QA_ROUTE.json';save(route_file,route);qa_env={**clean,'OMC_QA_ROUTE_FILE':str(route_file)}
         run('real17-to18-payload-data',['node',here/'payload-upgrade.mjs','--execute','/Applications/OMC-Preview.app',old_pkg,package,fixture,work/'payload-upgrade',built['package']['sha256']],seconds=900,env=qa_env)
-        phase('await-root-qa-ready');until=min(time.monotonic()+1800,deadline-600);ready_ok=False
-        while time.monotonic()<until:
-            try:
-                with urllib.request.urlopen(cfg['readyUrl'],timeout=20) as r:
-                    assert r.url==cfg['readyUrl'];body=r.read(16385);assert len(body)<=16384;value=json.loads(body)
-                if value.get('ready') is True and value.get('sourceTreeMac')==MAC and value.get('packageSha256')==built['package']['sha256']:ready_ok=True;break
-            except (OSError,ValueError):pass
-            time.sleep(10)
-        if not ready_ok:raise RuntimeError('QA_READY_NOT_BOUND_WITHIN_30_MINUTES_OR_OVERALL_DEADLINE')
+        phase('await-root-qa-ready');until=min(time.monotonic()+1800,deadline-600)
+        if not await_qa_ready(cfg['readyUrl'],until,built['package']['sha256']):raise RuntimeError('QA_READY_NOT_BOUND_WITHIN_30_MINUTES_OR_OVERALL_DEADLINE')
         run('reinstall-real17-for-button',['sudo','-n','/usr/sbin/installer','-pkg',old_pkg,'-target','/'],seconds=300)
         run('controlled-update-button',['node',here/'controlled-upgrade-17-to-18.mjs','/Applications/OMC-Preview.app',fixture,reports/'CONTROLLED_TUF_UPGRADE.json',built['package']['sha256']],seconds=min(4200,max(1,int(deadline-time.monotonic()-300))),env=qa_env)
         actual=json.loads((reports/'CONTROLLED_TUF_UPGRADE.json').read_bytes());assert actual['status']=='PASS_ACTUAL_SIGNED_DOWNLOAD_OS_HANDOFF_INSTALL_REOPEN_AND_PROJECT_PRESERVATION' and actual['controlledTransportRoute'] is True and actual['formalUrlServingTested'] is False
