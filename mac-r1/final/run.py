@@ -21,7 +21,7 @@ def safe_zip(archive,dest):
             with target.open('xb') as out:out.write(z.read(row))
 def main():
     parser=argparse.ArgumentParser();parser.add_argument('--execute',action='store_true');parser.add_argument('--config');parser.add_argument('--config-sha256');a=parser.parse_args()
-    if not a.execute:print(json.dumps({'status':'PREPARED_DISABLED_NO_NETWORK_APP_OR_KEY','stages':['parallel released17 download','authenticate native72 PKG+source delta','frontend-only build','new18 install/JPEG DOM/fullAI/normal exit','early encrypted PKG+reports publication','real17->18 installer data preservation','<=15min QA_READY','controlled real update button+target+Installer','final encrypted reports'],'nativeExecutionVerified':False}));return
+    if not a.execute:print(json.dumps({'status':'PREPARED_DISABLED_NO_NETWORK_APP_OR_KEY','stages':['parallel released17 download','authenticate native72 PKG+source delta','frontend-only build','new18 install/JPEG DOM/fullAI/normal exit','early encrypted PKG+reports publication','real17->18 installer data preservation','<=30min QA_READY (subject to overall deadline)','controlled real update button+target+Installer','final encrypted reports'],'nativeExecutionVerified':False}));return
     assert sys.platform=='darwin' and platform.machine()=='arm64' and os.environ.get('GITHUB_ACTIONS')=='true'
     assert os.environ.get('GITHUB_REPOSITORY')==REPO and os.environ.get('GITHUB_REF')=='refs/heads/verify-mac-r1-18' and os.environ.get('GITHUB_RUN_ATTEMPT')=='1'
     assert sha(a.config)==a.config_sha256;cfg=json.loads(Path(a.config).read_bytes());assert cfg['executeAuthorized'] is True and cfg['rootReviewedController'] is True and cfg['macRunsUsedBeforeThis']==4 and cfg['maxMacRuns']==5 and cfg['maxSeconds']==3600 and cfg['feeUSD']==0 and cfg['sourceTreeWindows']==WIN and cfg['sourceTreeMac']==MAC and cfg['backendBuiltFromMacTree']==NATIVE
@@ -36,7 +36,7 @@ def main():
     baseline=released17['assets'][0];assert baseline['id']=='final' and baseline['plaintextBytes']==1156045943 and baseline['ciphertextBytes']==1156045943 and baseline['plaintextSha256']==OLD_SHA and baseline['ciphertextSha256']=='f9a686901717492c3fc053e9a9793dfe69d07e4f614c468e05be3811ce34f11c'
     assert baseline['url']=='https://github.com/Siiiiimon123/OMC-build-checks/releases/download/omc-mac-update17-build-41192102628/final.enc'
     work=Path(os.environ['RUNNER_TEMP'])/'omc-mac-final-handoff';work.mkdir(mode=0o700,exist_ok=False);reports=work/'reports';reports.mkdir();started=time.monotonic();deadline=started+cfg['maxSeconds']
-    report={'status':'RUNNING','sourceTreeWindows':WIN,'sourceTreeMac':MAC,'backendBuiltFromMacTree':NATIVE,'controlledTransportRoute':True,'formalUrlServingTested':False,'automaticRerun':False,'steps':[],'forcedCleanup':[],'readinessWaitMaxSeconds':900};save(reports/'CONTROLLER.json',report)
+    report={'status':'RUNNING','sourceTreeWindows':WIN,'sourceTreeMac':MAC,'backendBuiltFromMacTree':NATIVE,'controlledTransportRoute':True,'formalUrlServingTested':False,'automaticRerun':False,'steps':[],'forcedCleanup':[],'readinessWaitMaxSeconds':1800};save(reports/'CONTROLLER.json',report)
     # Read existing transport/GitHub secrets only after every execution guard.
     key=os.environ.pop('OMC_PREVIEW15_TRANSPORT_KEY');token=os.environ.pop('GH_TOKEN');assert len(key)==64 and all(c in '0123456789abcdef' for c in key)
     clean=dict(os.environ);secret={**clean,'OMC_PREVIEW15_TRANSPORT_KEY':key};transport=tools/'transport.cjs';runid=os.environ['GITHUB_RUN_ID'];old_process=None
@@ -162,7 +162,7 @@ def main():
         route=cfg['qaRoute'];ready=urllib.parse.urlparse(cfg['readyUrl']);assert ready.scheme=='https' and ready.hostname=='omc.xiaoa.cyou' and ready.port in (None,443) and cfg['readyUrl'].startswith(route['qaMetadataPrefix']) and not ready.username and not ready.password and not ready.query and not ready.fragment
         route_file=work/'QA_ROUTE.json';save(route_file,route);qa_env={**clean,'OMC_QA_ROUTE_FILE':str(route_file)}
         run('real17-to18-payload-data',['node',here/'payload-upgrade.mjs','--execute','/Applications/OMC-Preview.app',old_pkg,package,fixture,work/'payload-upgrade',built['package']['sha256']],seconds=900,env=qa_env)
-        phase('await-root-qa-ready');until=min(time.monotonic()+900,deadline-600);ready_ok=False
+        phase('await-root-qa-ready');until=min(time.monotonic()+1800,deadline-600);ready_ok=False
         while time.monotonic()<until:
             try:
                 with urllib.request.urlopen(cfg['readyUrl'],timeout=20) as r:
@@ -170,7 +170,7 @@ def main():
                 if value.get('ready') is True and value.get('sourceTreeMac')==MAC and value.get('packageSha256')==built['package']['sha256']:ready_ok=True;break
             except (OSError,ValueError):pass
             time.sleep(10)
-        if not ready_ok:raise RuntimeError('QA_READY_NOT_BOUND_WITHIN_15_MINUTES')
+        if not ready_ok:raise RuntimeError('QA_READY_NOT_BOUND_WITHIN_30_MINUTES_OR_OVERALL_DEADLINE')
         run('reinstall-real17-for-button',['sudo','-n','/usr/sbin/installer','-pkg',old_pkg,'-target','/'],seconds=300)
         run('controlled-update-button',['node',here/'controlled-upgrade-17-to-18.mjs','/Applications/OMC-Preview.app',fixture,reports/'CONTROLLED_TUF_UPGRADE.json',built['package']['sha256']],seconds=min(4200,max(1,int(deadline-time.monotonic()-300))),env=qa_env)
         actual=json.loads((reports/'CONTROLLED_TUF_UPGRADE.json').read_bytes());assert actual['status']=='PASS_ACTUAL_SIGNED_DOWNLOAD_OS_HANDOFF_INSTALL_REOPEN_AND_PROJECT_PRESERVATION' and actual['controlledTransportRoute'] is True and actual['formalUrlServingTested'] is False

@@ -1,6 +1,6 @@
 import fs from'node:fs';import path from'node:path';import assert from'node:assert/strict';import{execFileSync,spawnSync}from'node:child_process';import{launch,delay}from'./controlled-cdp.mjs';
 if(process.argv[2]==='--plan'){console.log(JSON.stringify({status:'PREPARED_NOT_EXECUTED',controlledTransportRoute:true,formalUrlServingTested:false}));process.exit(0);}
-const[app,fixture,out,targetSha]=process.argv.slice(2);const report={status:'RUNNING',memberDataUsed:false,controlledQaClient:true,controlledTransportRoute:true,formalUrlServingTested:false,transportOnlyOverride:true,baseline:'unchanged released17 package',feed:'real embedded trust/signatures and formal target URLs; metadata requests alone routed through same-host QA prefix before main execution',productionTrustRootUnchanged:true,systemInstallerConsentAutomated:false};let c,profile;
+const[app,fixture,out,targetSha]=process.argv.slice(2);const report={status:'RUNNING',memberDataUsed:false,controlledQaClient:true,controlledTransportRoute:true,formalUrlServingTested:false,transportOnlyOverride:true,baseline:'unchanged released17 package',feed:'real embedded trust/signatures and formal target URLs; metadata and target requests routed through same-host QA nonce before main execution',productionTrustRootUnchanged:true,systemInstallerConsentAutomated:false};let c,profile;
 const snapshot='('+async function(){
  if(!(await indexedDB.databases()).some(d=>d.name==='omc-photo-select'))return null;
  const db=await new Promise((y,n)=>{const r=indexedDB.open('omc-photo-select');r.onsuccess=()=>y(r.result);r.onerror=()=>n(r.error);r.onupgradeneeded=()=>{r.transaction.abort();n(Error('Unexpected new database'));};});
@@ -34,7 +34,7 @@ try{
  await c.until('!document.querySelector(".workspace-status-strip--analysis")',180000);
  const qaDeadline=Date.now()+15*60000;let status;
  while(Date.now()<qaDeadline){status=await c.evaluate('window.electronAPI.checkForUpdates()');if(status.state==='available')break;await delay(15000);}
- assert.equal(status.state,'available');assert.equal(status.candidate.version,'1.0.21-preview.18');assert.equal(status.candidate.sha256,targetSha);
+ assert.equal(status.state,'available');assert.equal(status.candidate.version,'1.0.21-preview.18');assert.equal(status.candidate.sha256,targetSha);report.initialRouteEvidence=await c.mainEvaluateOnce('({...globalThis.__OMC_CONTROLLED_ROUTE_EVIDENCE__})');assert(report.initialRouteEvidence.metadataRequestsRouted>0&&report.initialRouteEvidence.targetRequestsRouted>0&&report.initialRouteEvidence.unexpectedActualRedirects===0);
  await c.click('检查更新');await c.until('document.querySelector(".update-release-notes")?.innerText.includes("Mac")',45000);await shot('update-notes-before-confirm');
  report.releaseNotesShown=true;report.payloadSha256=targetSha;
  const beforeProcesses=rows(),owned=new Set([c.child.pid]);for(let i=0;i<12;i++)for(const r of beforeProcesses)if(owned.has(r.ppid))owned.add(r.pid);
@@ -43,12 +43,12 @@ try{
  const downloadDeadline=Date.now()+65*60000;let last=0;
  while(Date.now()<downloadDeadline&&c.child.exitCode===null){
   try{const s=await c.evaluate('window.electronAPI.getUpdateStatus()');
-   if(s.state==='error'||s.reasonCode==='UPDATE_APP_BUSY'||(s.state==='downloaded'&&s.reasonCode!=='UPDATE_DOWNLOAD_VERIFIED'))throw Error('UPDATE_FLOW_FAILED:'+s.reasonCode);
+   if(s.state==='error'||s.reasonCode==='UPDATE_APP_BUSY'||(s.state==='downloaded'&&s.reasonCode!=='UPDATE_DOWNLOAD_VERIFIED'))throw Error('UPDATE_FLOW_FAILED:'+s.reasonCode);if(!report.packageRouteEvidence){const obs=await c.mainEvaluateOnce('({...globalThis.__OMC_CONTROLLED_ROUTE_EVIDENCE__})');if(obs.packageRequestsRouted>0&&obs.packageSha256Routed===targetSha)report.packageRouteEvidence=obs;}
    if(Date.now()-last>60000){console.log(JSON.stringify({phase:'actual-signed-qa-download',state:s.state,received:s.progress?.receivedBytes,total:s.progress?.totalBytes}));last=Date.now();}
   }catch(e){if(c.child.exitCode!==null)break;if(/UPDATE_FLOW_FAILED/.test(e.message))throw e;}
   await delay(1000);
  }
- assert.notEqual(c.child.exitCode,null,'Update did not exit the old app');report.oldExit=await exited;assert.equal(report.oldExit.code,0);
+ assert(report.packageRouteEvidence?.packageRequestsRouted>0&&report.packageRouteEvidence.packageSha256Routed===targetSha&&report.packageRouteEvidence.unexpectedActualRedirects===0,'QA_PACKAGE_ROUTE_NOT_PROVEN');assert.notEqual(c.child.exitCode,null,'Update did not exit the old app');report.oldExit=await exited;assert.equal(report.oldExit.code,0);
  let remaining;const settle=Date.now()+15000;do{remaining=tracked.filter(p=>rows().some(q=>q.pid===p.pid&&q.identity===p.identity));if(!remaining.length)break;await delay(200);}while(Date.now()<settle);assert.equal(remaining.length,0);report.oldOwnedProcessesSettled=true;
  const installerDeadline=Date.now()+15000;let installer;
  do{installer=spawnSync('/usr/bin/pgrep',['-f','/Installer.app/Contents/MacOS/Installer'],{encoding:'utf8'});if(installer.status===0)break;await delay(250);}while(Date.now()<installerDeadline);
