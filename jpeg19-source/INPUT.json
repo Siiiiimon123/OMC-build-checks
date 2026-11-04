@@ -1,0 +1,26 @@
+{
+  "schema": "omc-cloud-source-input-v1",
+  "sourceTree": "1e39b9ae2921480b27d4a1a8bf5f8499004886fa",
+  "assets": [
+    {
+      "id": "source19",
+      "plaintextBytes": 2650087,
+      "plaintextSha256": "9213f0f68cfc139e4887d0d7c0441478114098139afd4afde5278d74dcaad13b",
+      "ciphertextBytes": 2650087,
+      "nonceHex": "b0264b74fc3b7a0fa7d1723a",
+      "ciphertextSha256": "1e3f58d472b10ede5925840e9f8203c7e7f0e17c1d1db451ed1577af95cd891b",
+      "tagHex": "8e486201e3f58d932538e1257e37e663",
+      "url": "https://omc.xiaoa.cyou/updates/build-inputs/1e3f58d472b10ede5925840e9f8203c7e7f0e17c1d1db451ed1577af95cd891b.jpeg19.enc"
+    },
+    {
+      "id": "source19-records",
+      "plaintextBytes": 199394,
+      "plaintextSha256": "0484913c8ad6942c4a2cec271cf1b4b6215b92a9f4c6b1278e8dcee6e43872c5",
+      "ciphertextBytes": 199394,
+      "nonceHex": "c9dc2f9bef953771f5b33c2e",
+      "ciphertextSha256": "f2dfa1a06952e01637334690de4a9dd80cf505690c66f95b519f8cfe5c74033d",
+      "tagHex": "b0ff74fc94b6f750e1ff1b4ef41f4501",
+      "url": "https://omc.xiaoa.cyou/updates/build-inputs/f2dfa1a06952e01637334690de4a9dd80cf505690c66f95b519f8cfe5c74033d.jpeg19.enc"
+    }
+  ]
+}
