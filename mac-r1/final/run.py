@@ -4,6 +4,7 @@ Only disposable exact public-repo branch/run-attempt1; Root owns all readiness/f
 import argparse, hashlib, json, math, os, platform, re, signal, subprocess, sys, tarfile, threading, time, urllib.parse, urllib.request, zipfile
 from pathlib import Path, PurePosixPath
 from publication_helpers import publish
+from bounded_json_fetch import fetch_bounded
 if not __debug__: raise RuntimeError('PYTHON_OPTIMIZATION_FORBIDDEN')
 REPO='Siiiiimon123/OMC-build-checks';WIN='7fd90440ad51eb7abdf3407b6a25f09ca49a8604';MAC='42a64bd6e221d12cad35f0bd8e7d85ee89237e6a';NATIVE='126976cbb5e25f01bc1763294ba6a75800bc5f99'
 OLD_SHA='6400fe0d915dc0cd68a727772d7e66f9c168ef0d558e706caf40a71e0f9b00cc'
@@ -16,8 +17,9 @@ def await_qa_ready(url,until,package_sha):
         remaining=until-time.monotonic()
         if remaining<=0:return False
         try:
-            with urllib.request.urlopen(url,timeout=min(20,remaining)) as r:
-                assert r.url==url;body=r.read(16385);assert len(body)<=16384;value=json.loads(body)
+            status,actual,_,body=fetch_bounded(url,until,16384,no_redirect=True)
+            if status!=200 or actual!=url:raise ValueError('READY_NOT_AVAILABLE')
+            value=json.loads(body)
             if time.monotonic()>=until:return False
             issued=value.get('readyIssuedMonotonic');remote_deadline=value.get('serverDeadlineMonotonic')
             if value.get('ready') is True and value.get('sourceTreeMac')==MAC and value.get('packageSha256')==package_sha and type(issued) in (int,float) and type(remote_deadline) in (int,float) and math.isfinite(issued) and math.isfinite(remote_deadline) and 0<issued<remote_deadline:return True
