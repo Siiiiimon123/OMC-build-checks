@@ -1,0 +1,22 @@
+{
+  "schema": "omc-cloud-execution-scope-v1",
+  "authorization": "User explicitly requested cloud or GitHub VM validation instead of local validation, 2026-11-05",
+  "stage": "source-functional-before-packaging",
+  "branch": "verify-jpeg19-cloud",
+  "sourceTree": "1e39b9ae2921480b27d4a1a8bf5f8499004886fa",
+  "runs": 1,
+  "timeoutMinutes": 40,
+  "costLimitUSD": 0,
+  "syntheticOnly": true,
+  "memberPhotoUpload": false,
+  "productionChange": false,
+  "mainChange": false,
+  "automaticRerun": false,
+  "privateInputs": "authenticated encrypted source and source byte records only",
+  "evidence": "AES-256-GCM encrypted reports only",
+  "limitations": [
+    "Not installed-package acceptance",
+    "Not full AI acceptance",
+    "Real-photo upload awaits separate consent"
+  ]
+}
