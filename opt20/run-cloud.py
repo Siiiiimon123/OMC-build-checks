@@ -101,6 +101,19 @@ try:
     npm='npm.cmd' if os.name=='nt' else 'npm'
     if not stage('dependencies',[npm,'ci','--ignore-scripts','--no-audit','--no-fund'],source,timeout=420):
         raise RuntimeError('DEPENDENCY_PREPARATION_FAILED')
+    if os.environ.get('OMC_R24_NATIVE_YIELD_ONLY')=='1':
+        if expected['sourceTree']!='857898e7731bc52e4f72e9aad3cff37b6966f25e' or expected['sourcePathSha256Digest']!='b17eef7ba9a0cfafb4989f24fe30bb59d50c9c10a294ff7d76610410eb1eb271':
+            raise RuntimeError('INHERITED_SOURCE_CHECKS_NO_LONGER_APPLY')
+        inherited={'run':42113461856,'controlCommit':'7265e256760468217a21c9cdb19be335043f645e',
+            'sourceTree':expected['sourceTree'],'platform':sys.platform,'yieldContracts':5,'core':359,'browserPreview':9,
+            'buildPassed':True,'overallPriorRunPassed':False,'onlyNativeSchedulingRetested':True}
+        (REPORTS/'INHERITED_SOURCE_CHECKS.json').write_text(json.dumps(inherited),encoding='utf-8')
+        child_env.pop('ELECTRON_SKIP_BINARY_DOWNLOAD',None)
+        ready=stage('electron-runtime',['node','node_modules/electron/install.js'],source,timeout=300)
+        if ready:
+            case=REPORTS/'native-analysis-yield';case.mkdir()
+            ok=stage('native-analysis-yield-and-input-cancel',['node',str(HERE/'cloud-analysis-yield.mjs'),str(source),str(case)],source,timeout=180)
+        raise SystemExit(0 if ok else 1)
     if os.environ.get('OMC_R20_SOURCE_GUARDS_ONLY')=='1':
         checks=[]
         if os.environ.get('OMC_R24_ANALYSIS_YIELD')=='1':

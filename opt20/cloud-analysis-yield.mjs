@@ -27,6 +27,11 @@ try{
  ws.addEventListener('open',()=>{clearTimeout(timer);resolve();},{once:true});ws.addEventListener('error',()=>{clearTimeout(timer);reject(Error('CDP_OPEN_FAILED'));},{once:true});});
  ws.addEventListener('message',event=>{const value=JSON.parse(event.data),item=pending.get(value.id);if(!item)return;pending.delete(value.id);clearTimeout(item.timer);value.error?item.reject(Error(JSON.stringify(value.error))):item.resolve(value.result);});
  await call('Runtime.enable');report.browser=await call('Browser.getVersion');
+ let pageReady=false;for(let n=0;n<160;n++){
+  try{pageReady=await evaluate('location.origin==="http://localhost:5173"&&document.readyState!=="loading"&&document.querySelector("#root")?.textContent.length>40');if(pageReady)break;}catch{}
+  await sleep(100);
+ }
+ check(pageReady,'NORMAL_SOURCE_DOCUMENT_NOT_READY');
  report.environment=await evaluate('({nativeYieldAvailable:typeof globalThis.scheduler?.yield==="function",hardwareConcurrency:navigator.hardwareConcurrency,deviceMemory:navigator.deviceMemory??null,visibility:document.visibilityState})');
  check(report.environment.nativeYieldAvailable,'NATIVE_YIELD_NOT_AVAILABLE_NO_SPEED_CLAIM');
  report.trials=[];
@@ -46,21 +51,23 @@ try{
  // disposable QA control, not a claim about an untested photo-analysis button.
  const point=await evaluate(`(async()=>{
   const {yieldToAnalysisEventLoop:yieldTask}=await import('/src/services/analysisPerformance.js');
-  const controller=new AbortController();window.__yieldProbe={count:0,clicked:false,settled:false,completed:false};
+  const controller=new AbortController();window.__yieldProbe={count:0,clicked:false,settled:false,completed:false,inputEvent:null};
   const button=document.createElement('button');button.textContent='Cancel QA scheduling';button.id='omc-qa-yield-cancel';
   Object.assign(button.style,{position:'fixed',left:'20px',top:'20px',width:'220px',height:'60px',zIndex:'2147483647'});
-  button.onclick=()=>{window.__yieldProbe.clicked=true;controller.abort(Object.assign(new Error('QA_INPUT_CANCEL'),{name:'AbortError'}));};document.body.append(button);
+  button.onpointerdown=event=>{window.__yieldProbe.clicked=true;window.__yieldProbe.inputEvent=event.type;controller.abort(Object.assign(new Error('QA_INPUT_CANCEL'),{name:'AbortError'}));};document.body.append(button);
   const guard=setTimeout(()=>controller.abort(new Error('QA_DEADLINE')),15000);
-  window.__yieldPromise=(async()=>{try{for(let i=0;i<50000;i++){await yieldTask(controller.signal);window.__yieldProbe.count++;}window.__yieldProbe.completed=true;}
+  window.__yieldPromise=(async()=>{try{for(let i=0;i<200000;i++){await yieldTask(controller.signal);window.__yieldProbe.count++;}window.__yieldProbe.completed=true;}
    catch(error){window.__yieldProbe.error=error.message;window.__yieldProbe.errorName=error.name;}
    finally{clearTimeout(guard);window.__yieldProbe.settled=true;}})();
   const r=button.getBoundingClientRect();return{x:r.x+r.width/2,y:r.y+r.height/2};
  })()`);
- for(let n=0;n<100;n++){if(await evaluate('window.__yieldProbe.count>=20||window.__yieldProbe.settled'))break;await sleep(10);}
+ // Do not wait for a low-priority Runtime.evaluate poll before sending input:
+ // the benchmark may finish while that inspector command is queued.
  for(const type of ['mousePressed','mouseReleased'])await call('Input.dispatchMouseEvent',{type,...point,button:'left',buttons:type==='mousePressed'?1:0,clickCount:1});
  for(let n=0;n<100;n++){if(await evaluate('window.__yieldProbe.settled'))break;await sleep(10);}
  report.realInputCancellation=await evaluate('window.__yieldProbe');
- check(report.realInputCancellation.clicked&&report.realInputCancellation.settled&&!report.realInputCancellation.completed
+ check(report.realInputCancellation.clicked&&report.realInputCancellation.inputEvent==='pointerdown'
+  &&report.realInputCancellation.settled&&!report.realInputCancellation.completed
   &&report.realInputCancellation.error==='QA_INPUT_CANCEL'&&report.realInputCancellation.errorName==='AbortError','REAL_INPUT_CANCEL_DID_NOT_STOP_LOOP');
  report.rendererJsHeap=await call('Runtime.getHeapUsage');
  report.status='PASS_NATIVE_TASK_YIELD_COMPARISON_AND_INPUT_CANCEL';
@@ -71,7 +78,11 @@ try{
 finally{
  report.cleanup=[];
  for(const child of [app,vite])if(child?.pid){
-  if(process.platform==='win32')await new Promise(resolve=>{const task=spawn('taskkill',['/PID',String(child.pid),'/T','/F'],{stdio:'ignore'});task.on('exit',resolve);task.on('error',resolve);});
+  if(process.platform==='win32'){
+   const killCode=await new Promise(resolve=>{const task=spawn('taskkill',['/PID',String(child.pid),'/T','/F'],{stdio:'ignore'});task.on('exit',resolve);task.on('error',()=>resolve('SPAWN_ERROR'));});
+   const end=Date.now()+5000;while(child.exitCode===null&&child.signalCode===null&&Date.now()<end)await sleep(30);
+   report.cleanup.push({pid:child.pid,taskkillExitCode:killCode});
+  }
   else{for(const signal of ['SIGTERM','SIGKILL']){if(child.exitCode!==null||child.signalCode!==null)break;try{process.kill(-child.pid,signal);}catch(error){if(error.code!=='ESRCH')report.cleanup.push({pid:child.pid,error:error.code});}
    const end=Date.now()+3000;while(child.exitCode===null&&child.signalCode===null&&Date.now()<end)await sleep(30);}}
   const settled=child.exitCode!==null||child.signalCode!==null;report.cleanup.push({pid:child.pid,settled,exitCode:child.exitCode,signal:child.signalCode});
