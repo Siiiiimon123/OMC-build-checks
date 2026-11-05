@@ -13,7 +13,10 @@ WORK=Path(os.environ['RUNNER_TEMP'])/'omc-optimization-r20'
 WORK.mkdir(exist_ok=False)
 REPORTS=WORK/'reports';REPORTS.mkdir()
 ENCRYPTED=WORK/'encrypted';ENCRYPTED.mkdir()
-TRANSPORT=HERE.parent/'final19/transport.cjs'
+TRANSPORT=WORK/'transport.cjs'
+raw_transport=subprocess.run(['git','show','HEAD:final19/transport.cjs'],cwd=HERE.parent,
+                             stdout=subprocess.PIPE,stderr=subprocess.PIPE,check=True).stdout
+TRANSPORT.write_bytes(raw_transport)
 EXPECTED_TRANSPORT='19f37e9f504c90cd26dc7ca9da8606af9a13154e2a9ec6f0fdd20e026d4ff90f'
 if hashlib.sha256(TRANSPORT.read_bytes()).hexdigest()!=EXPECTED_TRANSPORT:
     raise RuntimeError('TRANSPORT_IDENTITY_MISMATCH')
@@ -51,6 +54,24 @@ try:
             if p.is_absolute() or '..' in p.parts or '\\' in item.filename or not item.filename or item.file_size>16*1024*1024:
                 raise RuntimeError('INVALID_SOURCE_ARCHIVE')
         z.extractall(source)
+    if (HERE/'overlay.enc').exists():
+        overlay=WORK/'overlay.zip'
+        if not stage('authenticate-overlay',['node',str(TRANSPORT),'decrypt','--input',str(HERE/'overlay.enc'),
+            '--manifest',str(HERE/'overlay.transport.json'),'--id','r20-overlay','--output',str(overlay)],private_env=True):
+            raise RuntimeError('OVERLAY_AUTHENTICATION_FAILED')
+        with zipfile.ZipFile(overlay) as z:
+            rows=json.loads(z.read('PATCH.json'))
+            for row in rows:
+                p=PurePosixPath(row['path'])
+                if p.is_absolute() or '..' in p.parts or '\\' in row['path']:
+                    raise RuntimeError('INVALID_OVERLAY_PATH')
+                target=source/row['path']
+                if hashlib.sha256(target.read_bytes()).hexdigest()!=row['beforeSha256']:
+                    raise RuntimeError('OVERLAY_BASE_MISMATCH')
+                data=z.read(row['path'])
+                if hashlib.sha256(data).hexdigest()!=row['sha256']:
+                    raise RuntimeError('OVERLAY_BYTES_MISMATCH')
+                target.write_bytes(data)
     npm='npm.cmd' if os.name=='nt' else 'npm'
     if not stage('dependencies',[npm,'ci','--ignore-scripts','--no-audit','--no-fund'],source,timeout=420):
         raise RuntimeError('DEPENDENCY_PREPARATION_FAILED')
@@ -62,7 +83,11 @@ try:
     checks=[stage('targeted',['node','--test',*targeted],source),
         stage('core',[npm,'run','test:core'],source),
         stage('browser-preview',[npm,'run','test:browser-preview'],source),
-        stage('build',[npm,'run','build:browser-preview'],source)]
+        stage('build',[npm,'run','build'],source)]
+    previous=source/'preview-manifest.json'
+    if previous.exists():
+        previous.rename(REPORTS/'previous-preview-manifest.json')
+    checks.append(stage('prepare-preview',['node','scripts/startBrowserPreview.mjs','--prepare'],source))
     if stage('python-dependency',[sys.executable,'-m','pip','install','--disable-pip-version-check',
         '--no-cache-dir','numpy==2.5.0rc1'],timeout=180):
         checks.append(stage('python-regression',[sys.executable,'-m','unittest','discover',
