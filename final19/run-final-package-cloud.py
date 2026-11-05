@@ -14,6 +14,7 @@ import sys
 import traceback
 import zipfile
 import ast
+import time
 
 HERE = Path(__file__).resolve().parent
 WORK = Path(os.environ['RUNNER_TEMP']).resolve() / 'omc-final-package19'
@@ -84,6 +85,29 @@ def main():
         assert p.returncode == 0, label + '_FAILED'
 
     transport = HERE / 'transport.cjs'
+    def fetch_exact(label, manifest, asset_id, output):
+        # Retry only a read of the same authenticated bytes, never an entire
+        # build/test job. Every failed attempt retains its own private log.
+        failures = []
+        for attempt in range(1, 4):
+            try:
+                run(label + '-attempt-' + str(attempt), ['node', transport, 'fetch',
+                    '--manifest', manifest, '--id', asset_id, '--output', output],
+                    timeout=600, private=True)
+                save(evidence / (label + '-attempts.json'), {'attempts': attempt,
+                    'priorFailures': failures, 'exactAsset': asset_id, 'status': 'PASS'})
+                return
+            except (AssertionError, subprocess.TimeoutExpired) as exc:
+                failures.append({'attempt': attempt, 'error': type(exc).__name__})
+                assert not output.exists(), 'UNEXPECTED_COMMITTED_OUTPUT_AFTER_FAILED_FETCH'
+                for temporary in output.parent.glob(output.name + '.*.part'):
+                    assert temporary.is_file() and not temporary.is_symlink()
+                    temporary.unlink()  # Only this attempt's reproducible VM download.
+                save(evidence / (label + '-attempts.json'), {'attempts': attempt,
+                    'priorFailures': failures, 'exactAsset': asset_id, 'status': 'RETRY_PENDING' if attempt < 3 else 'FAIL'})
+                if attempt == 3:
+                    raise
+                time.sleep(3 if attempt == 1 else 7)
     package = None
     success = False
     try:
@@ -128,12 +152,10 @@ def main():
                 ps += "$t=$null;$e=$null;[void][System.Management.Automation.Language.Parser]::ParseFile('" + literal + "',[ref]$t,[ref]$e);if($e.Count){throw ($e|Out-String)};"
             run('parse-native-install-helpers', ['powershell.exe', '-NoProfile', '-Command', ps], timeout=60)
         # The 1.06GB existing model transport is downloaded/decrypted only here.
-        run('fetch-existing-model-transport', ['node', transport, 'fetch', '--manifest', HERE / 'RESOURCE_TRANSPORT.json',
-            '--id', 'base', '--output', WORK / 'base.tar'], timeout=1200, private=True)
+        fetch_exact('fetch-existing-model-transport', HERE / 'RESOURCE_TRANSPORT.json', 'base', WORK / 'base.tar')
         if sys.platform == 'win32':
             assert platform.python_version() == '3.14.5'
-            run('fetch-existing-windows18', ['node', transport, 'fetch', '--manifest', HERE / 'WIN18_BASE_OUTPUTS.json',
-                '--id', 'pkg', '--output', WORK / 'win18.exe'], timeout=1200, private=True)
+            fetch_exact('fetch-existing-windows18', HERE / 'WIN18_BASE_OUTPUTS.json', 'pkg', WORK / 'win18.exe')
             run('npm-ci-fixed-source', ['npm.cmd', 'ci', '--ignore-scripts', '--no-audit', '--no-fund'], source)
             venv = WORK / 'venv'
             run('create-build-venv', [sys.executable, '-m', 'venv', venv])

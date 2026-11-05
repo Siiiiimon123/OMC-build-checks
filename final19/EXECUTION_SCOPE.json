@@ -14,7 +14,7 @@
   "automaticRerun": false,
   "stopRepeatingSuccessfulStage": true,
   "executed": {
-    "windows": 5,
+    "windows": 6,
     "mac": 2
   },
   "sameApprovedTwoPhotosOnly": true,
@@ -27,8 +27,9 @@
     "platforms": [
       "windows"
     ],
-    "windowsAttempt": 6,
-    "reason": "After verified compilation, unlink only temporary compiler input links and keep original runtime single-link files",
+    "windowsAttempt": 7,
+    "reason": "Read run42001102551 report; encrypted model input transfer failed before compilation. Add at most3 exact authenticated read attempts inside this job; retain temporary-link fix.",
+    "approval": "User same-scope free repair continuation; no repeated approval requested",
     "macBuildStoppedAfterSuccess": true
   },
   "windowsSingleSupplement": {
