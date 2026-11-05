@@ -103,6 +103,10 @@ try:
         raise RuntimeError('DEPENDENCY_PREPARATION_FAILED')
     if os.environ.get('OMC_R20_SOURCE_GUARDS_ONLY')=='1':
         checks=[]
+        if os.environ.get('OMC_R23_TECHNICAL_AND_PREVIEW')=='1':
+            checks.append(stage('directional-triage-and-neutral-preview-contracts',['node','--test',
+                'src/services/ai/technicalWasteEvaluator.test.js',
+                'src/services/automaticAdjustmentPreview.test.js'],source))
         if os.environ.get('OMC_R21_INCREMENTAL')=='1':
             checks.append(stage('source-recovery-compatibility',['node','--test','src/services/sourceRecoveryEdits.test.js',
                 'src/services/sourceRecoveryGroupPreservation.test.js'],source))
