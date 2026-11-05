@@ -191,6 +191,14 @@ def main():
             installed = installation['executable']
             result['firstInstallPayloadPassed'] = True
             result['shortcutBindingPassed'] = installation['shortcutBindingPassed']
+            if os.environ.get('OMC_SHORTCUT_DIAGNOSTIC') == '1':
+                for log in Path(os.environ['TEMP']).glob('omc-preview16-shortcut-*.log'):
+                    shutil.copyfile(log, evidence / log.name)
+                run('isolated-shortcut-differential', ['node', HERE / 'cloud-shortcut-probe.cjs',
+                    source, inputs, WORK / 'shortcut-probe', evidence], timeout=600)
+                result['status'] = 'DIAGNOSTIC_COMPLETE_NOT_RELEASE'
+                success = True
+                return 0
         elif sys.platform == 'win32':
             # A new build alone requires model transport; acceptance reuses the frozen installer.
             fetch_exact('fetch-existing-model-transport', HERE / 'RESOURCE_TRANSPORT.json', 'base', WORK / 'base.tar')
@@ -274,7 +282,7 @@ if __name__ == '__main__':
         for file in HERE.glob('*.py'):
             ast.parse(file.read_text(encoding='utf8'), filename=str(file))
         for name in ('cloud-final-windows-build.cjs', 'cloud-final-installed.mjs',
-                     'cloud-final-flow.mjs', 'transport.cjs', 'bootstrap.cjs', 'contracts.cjs'):
+                     'cloud-final-flow.mjs', 'cloud-shortcut-probe.cjs', 'transport.cjs', 'bootstrap.cjs', 'contracts.cjs'):
             file = HERE / name
             assert file.is_file(), 'WORKFLOW_INPUT_MISSING:' + name
             subprocess.run(['node', '--check', str(file)], check=True, timeout=30)

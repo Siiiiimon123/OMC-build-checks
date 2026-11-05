@@ -14,7 +14,7 @@
   "automaticRerun": false,
   "stopRepeatingSuccessfulStage": true,
   "executed": {
-    "windows": 10,
+    "windows": 11,
     "mac": 2
   },
   "sameApprovedTwoPhotosOnly": true,
@@ -27,11 +27,11 @@
     "platforms": [
       "windows"
     ],
-    "windowsAttempt": 11,
-    "mode": "ACCEPT_EXISTING_FROZEN_INSTALLER_NO_BUILD",
+    "windowsAttempt": 12,
+    "mode": "FROZEN_INSTALLER_SHORTCUT_DIFFERENTIAL_ONLY",
     "artifact": 13402959173,
     "sha256": "daade4392f5b77262fbd1f53b4ffbcb89e73290952f1a0779739c0ff8d97eb27",
-    "reason": "Read run42007557211: installed payload passes but no matching desktop target. Collect full link inventory, retain release blocker, independently run installed complete AI and JPEG/group/export rather than suppressing them.",
+    "reason": "Run42009299924 proves installed complete AI and all three JPEG/group/export cases pass. Real 2422-byte OMC desktop link has empty target/icon. Collect actual customInstall log and isolate native NSIS versus AUMI plugin versus current macro; no successful AI/JPEG repetition or product rebuild.",
     "approval": "User same-scope free continuation, no repeated questions",
     "macRebuilt": false
   },
