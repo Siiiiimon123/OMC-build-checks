@@ -101,8 +101,12 @@ try:
     if not stage('dependencies',[npm,'ci','--ignore-scripts','--no-audit','--no-fund'],source,timeout=420):
         raise RuntimeError('DEPENDENCY_PREPARATION_FAILED')
     if os.environ.get('OMC_R20_SOURCE_GUARDS_ONLY')=='1':
-        checks=[stage('core',[npm,'run','test:core'],source),
-            stage('browser-preview',[npm,'run','test:browser-preview'],source)]
+        checks=[]
+        if os.environ.get('OMC_R20_COMMIT_WAVE')=='1':
+            checks.append(stage('durable-analysis-wave-contracts',['node','--test','src/services/analysisPerformance.test.js',
+                'src/services/analysisTerminalCommit.test.js','src/services/ai/modelLoaderBatch.test.js'],source))
+        checks.extend([stage('core',[npm,'run','test:core'],source),
+            stage('browser-preview',[npm,'run','test:browser-preview'],source)])
         previous=source/'preview-manifest.json'
         if previous.exists():previous.rename(REPORTS/'previous-preview-manifest.json')
         checks.append(stage('build-browser-preview',[npm,'run','build:browser-preview'],source))
