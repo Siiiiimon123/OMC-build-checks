@@ -1,0 +1,43 @@
+name: JPEG19 finished export and group cloud acceptance
+'on':
+  push:
+    branches: ['verify-finished-jpeg19']
+    paths: ['.github/workflows/finished19.yml', 'jpeg19-source/**']
+permissions: {contents: read}
+concurrency: {group: omc-finished-jpeg19, cancel-in-progress: false}
+jobs:
+  finished:
+    if: github.repository == 'Siiiiimon123/OMC-build-checks' && github.event.repository.private == false && github.run_attempt == 1
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: windows-2025, arch: x64}
+          - {os: macos-15, arch: arm64}
+    runs-on: '${{ matrix.os }}'
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with: {persist-credentials: false, fetch-depth: 1}
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with: {node-version: '24.19.0', architecture: '${{ matrix.arch }}', check-latest: false, package-manager-cache: false}
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with: {python-version: '3.12.10', architecture: '${{ matrix.arch }}', check-latest: false}
+      - name: Validate actual cloud drivers before product execution
+        run: |
+          node --check jpeg19-source/cloud-finished-run.mjs
+          node --check jpeg19-source/cloud-finished-flow.mjs
+          node jpeg19-source/cloud-finished-preflight.mjs
+      - name: Real finished JPEG export and similar-group editing
+        env:
+          OMC_PREVIEW15_TRANSPORT_KEY: '${{ secrets.OMC_PREVIEW15_TRANSPORT_KEY }}'
+          PYTHONDONTWRITEBYTECODE: '1'
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: python jpeg19-source/run-finished-cloud.py
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        if: always()
+        with:
+          name: 'finished19-${{ matrix.os }}-encrypted-evidence'
+          path: '${{ runner.temp }}/omc-jpeg19-cloud/encrypted/*'
+          retention-days: 3
+          if-no-files-found: error
