@@ -70,7 +70,9 @@ try{
  const files=[];
  for(let n=0;n<1000;n++){const p=path.join(stressDir,`stress-${String(n).padStart(4,'0')}.jpg`);fs.linkSync(mothers[n%16],p);files.push(p);}
 
- report.stressScope={logicalInputs:1000,uniquePixelSources:16,syntheticOnly:true,hardlinks:true,
+ const recoveryCount=process.env.OMC_R20_RECOVERY_UI_ONLY==='1'?128:1000;
+ files.splice(recoveryCount);
+ report.stressScope={logicalInputs:recoveryCount,uniquePixelSources:16,syntheticOnly:true,hardlinks:true,
   physicalSourceBytes,osPageCacheBenefits:true,realPhotoThroughputQualified:false,aiThroughputQualified:false};
  const sourceHashes=new Map(mothers.map(file=>[file,hash(fs.readFileSync(file))]));
  async function snapshot(){return ev(`new Promise((resolve,reject)=>{
@@ -132,6 +134,7 @@ try{
   });}finally{socket.close();}
  }
 
+ if(process.env.OMC_R20_RECOVERY_UI_ONLY!=='1'){
  report.stage='mixed-valid-and-damaged-import';
  const damaged=path.join(stressDir,'damaged.jpg');fs.writeFileSync(damaged,Buffer.from([255,216,255,224,0,16,74,70,73,70]));
  const mixed=[...files.slice(0,32),damaged];
@@ -160,11 +163,12 @@ try{
  profile=path.join(work,'profile-recovery');await startApp();
  await until('[...document.querySelectorAll("button")].some(e=>e.offsetWidth&&e.innerText.trim()==="使用此编号开始选片")');await click('使用此编号开始选片');
  if(await ev('Boolean(document.querySelector("button[aria-label=跳过新手引导]"))'))await click('跳过新手引导');
- report.stage='interrupt-thousand-import';
+ }
+ report.stage='interrupt-import';
  await click('导入照片');assert(await installCloudImportPicker(work,files,1000),'RECOVERY_PICKER');await click('选择文件');
  await waitSnapshot(v=>v.project?.importState==='importing'&&v.project.count>=12,'FIRST_DURABLE_BATCH',180000);
  const before=await markHumanKeep();
- assert(before.project.count<1000&&before.project.importState==='importing','IMPORT_FINISHED_BEFORE_INTERRUPTION');
+ assert(before.project.count<recoveryCount&&before.project.importState==='importing','IMPORT_FINISHED_BEFORE_INTERRUPTION');
  report.interruption={project:before.project,assetCount:before.assets.length,
    humanDecision:before.decisions.find(d=>d.decision==='keep'&&d.humanOverride===true)};
  report.interruption.processExit=await stopApp(true);await startApp();
@@ -179,7 +183,7 @@ try{
  assert(await mainDirectoryPicker(stressDir),'RECOVERY_DIRECTORY_ADAPTER');
  const resumeStart=Date.now();await click('核验原片并补全导入');
  const recovered=await waitSnapshot(v=>v.project?.id===before.project.id&&v.project.importState==='complete','RECOVERY_NOT_COMPLETE',600000);
- assert(recovered.project.count===1000&&recovered.project.manifestCount===1000&&recovered.assets.length===1000&&recovered.project.progress===1,'RECOVERY_FINAL_ACCOUNTING');
+ assert(recovered.project.count===recoveryCount&&recovered.project.manifestCount===recoveryCount&&recovered.assets.length===recoveryCount&&recovered.project.progress===1,'RECOVERY_FINAL_ACCOUNTING');
  assert(recovered.decisions.some(d=>JSON.stringify(d)===JSON.stringify(report.interruption.humanDecision)),'RECOVERY_CHANGED_HUMAN_DECISION');
  for(const [sourcePath,old] of restoredBefore){const next=recovered.assets.find(a=>a.path===sourcePath);
   assert(next&&next.id===old.id&&next.sha===old.sha&&next.revision===old.revision,'RECOVERY_CHANGED_EXISTING_PHOTO_IDENTITY');}
@@ -187,9 +191,27 @@ try{
  const heap=await call('Runtime.getHeapUsage');assert(heap.usedSize<512*1024*1024,'RECOVERY_RENDERER_HEAP_BUDGET');
  report.recovered={project:recovered.project,assets:recovered.assets.length,preexistingIdentitiesPreserved:restoredBefore.size,
    humanDecisionPreserved:true,resumeElapsedMs:Date.now()-resumeStart,rendererJsHeap:heap};
+
+ if(process.env.OMC_R20_RECOVERY_UI_ONLY==='1'){
+  report.stage='actual-ui-after-recovery-commit';const uiStart=Date.now();
+  await until('!document.querySelector(".project-card[aria-busy=true]")&&Boolean(document.querySelector(".project-drawer-close:not(:disabled)"))',30000);
+  await click('关闭项目抽屉');await until('!document.querySelector(".project-drawer-close")');
+  await until(`document.querySelector('.statusbar')?.innerText.replace(/\s+/g,' ').includes('未处理 ${recoveryCount-1}')`,30000);
+  const uiBefore=await ev('document.querySelector(".statusbar").innerText');
+  await click('网格');await until('document.querySelectorAll(".photo-tile").length>=2');
+  assert(await ev(`(()=>{const candidates=[...document.querySelectorAll('.photo-tile')];const next=candidates.find(e=>e.innerText.includes('未处理'));if(!next)return false;next.click();return true})()`),'NEXT_UNTREATED_VISIBLE_PHOTO');
+  await click('单图');await until('Boolean(document.querySelector(".single-photo-view"))');
+  await ev('(()=>{document.querySelector(".single-photo-view").focus();return true})()');
+  for(const type of ['keyDown','keyUp'])await call('Input.dispatchKeyEvent',{type,key:'Enter',code:'Enter',windowsVirtualKeyCode:13});
+  const continued=await waitSnapshot(v=>v.decisions?.filter(d=>d.decision==='keep'&&d.humanOverride===true).length===2,'REVIEW_AFTER_RECOVERY_NOT_DURABLE');
+  assert(continued.project.id===before.project.id&&continued.project.importState==='complete','POST_RECOVERY_REVIEW_PROJECT_CHANGED');
+  await until(`document.querySelector('.statusbar')?.innerText.replace(/\s+/g,' ').includes('未处理 ${recoveryCount-2}')`,30000);
+  report.uiContinuation={waitAfterCommitMs:Date.now()-uiStart,total:recoveryCount,before:uiBefore,
+   after:await ev('document.querySelector(".statusbar").innerText'),realKeyboardReviewAfterRecovery:true,keepCount:2};
+ }
  report.allSyntheticSourcesUnchanged=mothers.every(file=>hash(fs.readFileSync(file))===sourceHashes.get(file));
  assert(report.allSyntheticSourcesUnchanged,'SYNTHETIC_ORIGINAL_BYTES_CHANGED');
- await snap('photo-grid');report.status='PASS_SOURCE_MIXED_IMPORT_AND_INTERRUPTED_1000_PATH_RECOVERY';report.stage='done';
+ await snap('photo-grid');report.status=process.env.OMC_R20_RECOVERY_UI_ONLY==='1'?'PASS_SOURCE_RECOVERY_UI_CONTINUATION_128_PATHS':'PASS_SOURCE_MIXED_IMPORT_AND_INTERRUPTED_1000_PATH_RECOVERY';report.stage='done';
  report.limitations=['Source development entry, not installed package or complete AI','16 synthetic pixel sources over 1000 hardlinked paths; not 1000 independent real photos',
   'Native import/recovery picker UI answers adapted; all file grants, hashes, decodes, DB writes and recovery transactions are production paths',
   'Forced exit targets only this disposable Windows QA application; user computer untouched','Renderer JS heap is not total process/native memory'];
