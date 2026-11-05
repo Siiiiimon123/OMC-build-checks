@@ -80,20 +80,64 @@ try:
         'src/services/jpegPreviewRenderer.test.js','src/workers/jpegAdjustmentPreview.worker.test.js',
         'src/services/ai/enhancedAnalysisTermination.test.js','src/services/ai/analysisIntegrityRegression.test.js',
         'src/services/ai/modelLoaderBatch.test.js','src/services/imageAnalyzer.test.js']
-    checks=[stage('targeted',['node','--test',*targeted],source),
-        stage('core',[npm,'run','test:core'],source),
-        stage('browser-preview',[npm,'run','test:browser-preview'],source),
-        stage('build',[npm,'run','build'],source)]
+    native_ui=os.environ.get('OMC_R20_NATIVE_UI')=='1'
+    if native_ui:
+        # The prior frozen source passed full regressions. Only the additional
+        # viewport policy changed; test that delta and the real native flow.
+        targeted=['src/services/jpegExposureService.test.js','src/services/jpegExposureServiceV2.test.js',
+                  'src/services/jpegPreviewRenderer.test.js','src/services/savedAdjustmentPreview.test.js']
+    checks=[stage('targeted',['node','--test',*targeted],source)]
+    if not native_ui:
+        checks.extend([stage('core',[npm,'run','test:core'],source),
+                       stage('browser-preview',[npm,'run','test:browser-preview'],source)])
+    checks.append(stage('build',[npm,'run','build'],source))
     previous=source/'preview-manifest.json'
     if previous.exists():
         previous.rename(REPORTS/'previous-preview-manifest.json')
     checks.append(stage('prepare-preview',['node','scripts/startBrowserPreview.mjs','--prepare'],source))
-    if stage('python-dependency',[sys.executable,'-m','pip','install','--disable-pip-version-check',
-        '--no-cache-dir','numpy==2.5.0rc1'],timeout=180):
-        checks.append(stage('python-regression',[sys.executable,'-m','unittest','discover',
-            '-s','ai-training/tests','-p','test_technical_probability_precision.py'],source))
-    else:
-        checks.append(False)
+    if not native_ui:
+        if stage('python-dependency',[sys.executable,'-m','pip','install','--disable-pip-version-check',
+            '--no-cache-dir','numpy==2.5.0rc1'],timeout=180):
+            checks.append(stage('python-regression',[sys.executable,'-m','unittest','discover',
+                '-s','ai-training/tests','-p','test_technical_probability_precision.py'],source))
+        else:
+            checks.append(False)
+    if native_ui and all(checks):
+        child_env.pop('ELECTRON_SKIP_BINARY_DOWNLOAD',None)
+        if not stage('electron-runtime',['node','node_modules/electron/install.js'],source,timeout=300):
+            raise RuntimeError('ELECTRON_PREPARATION_FAILED')
+        prior=HERE.parent/'jpeg19-source'
+        prior_inputs=json.loads((prior/'INPUT.json').read_bytes())
+        for asset in prior_inputs['assets']:
+            if asset['id'] not in ('sample-a','sample-b'):
+                continue
+            cipher=WORK/(asset['id']+'.enc')
+            parts=sorted((prior/'inputs'/asset['id']).glob('*.enc'))
+            if len(parts)!=(asset['ciphertextBytes']+65535)//65536:
+                raise RuntimeError('APPROVED_PHOTO_INPUT_MISSING')
+            with cipher.open('xb') as output:
+                for i,part in enumerate(parts):
+                    if part.name!=str(i).zfill(4)+'.enc':
+                        raise RuntimeError('PHOTO_PART_ORDER')
+                    output.write(part.read_bytes())
+            manifest=WORK/(asset['id']+'.transport.json')
+            manifest.write_text(json.dumps({'schema':'omc-aes256gcm-build-transport-v1','assets':[asset]}),encoding='utf-8')
+            if not stage('authenticate-'+asset['id'],['node',str(TRANSPORT),'decrypt','--input',str(cipher),
+                '--manifest',str(manifest),'--id',asset['id'],'--output',str(WORK/(asset['id']+'.jpg'))],private_env=True):
+                raise RuntimeError('PHOTO_AUTHENTICATION_FAILED')
+        for identity in ('sample-a','sample-b','synthetic'):
+            case=REPORTS/('native-'+identity);case.mkdir()
+            child_env['OMC_R20_VIEWPORT']='compact' if identity=='sample-a' else 'wide'
+            command=['node',str(HERE/'cloud-finished-run.mjs'),str(source),str(case)]
+            if identity!='synthetic':
+                command.append(str(WORK/(identity+'.jpg')))
+            checks.append(stage('native-'+identity,command,source,timeout=420))
+            if not checks[-1]:
+                break
+        if os.name=='nt' and all(checks):
+            case=REPORTS/'native-stress';case.mkdir()
+            child_env['OMC_R20_VIEWPORT']='compact'
+            checks.append(stage('native-stress',['node',str(HERE/'cloud-stress-run.mjs'),str(source),str(case)],source,timeout=840))
     ok=all(checks)
 except Exception as error:
     # Keep source-bearing exceptions private; public Actions logs show only stage status.
@@ -101,14 +145,15 @@ except Exception as error:
     (REPORTS/'controller-error.log').write_text(traceback.format_exc(),encoding='utf-8')
 finally:
     result={'status':'PASS_SOURCE_REGRESSION_NOT_RELEASE' if ok else 'FAIL_SOURCE_REGRESSION',
-            'platform':sys.platform,'stages':stages,'memberPhotosUsed':False,
+            'platform':sys.platform,'stages':stages,'memberPhotosUsed':os.environ.get('OMC_R20_NATIVE_UI')=='1',
             'realThousandPhotoQualified':False,'gpuPerformanceQualified':False,
             'installerBuilt':False,'published':False}
     (REPORTS/'SUMMARY.json').write_text(json.dumps(result,indent=2)+'\n',encoding='utf-8')
     packed=WORK/'reports.zip'
     with zipfile.ZipFile(packed,'x',compression=zipfile.ZIP_DEFLATED) as z:
-        for file in sorted(REPORTS.iterdir()):
-            z.write(file,file.name)
+        for file in sorted(REPORTS.rglob('*')):
+            if file.is_file():
+                z.write(file,file.relative_to(REPORTS).as_posix())
     subprocess.run(['node',str(TRANSPORT),'encrypt','--input',str(packed),
         '--output',str(ENCRYPTED/'reports.enc'),'--manifest',str(ENCRYPTED/'REPORTS_READY.json'),
         '--id','r20-reports'],check=True)
