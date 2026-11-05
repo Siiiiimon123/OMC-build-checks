@@ -8,6 +8,7 @@ import subprocess
 import sys
 import time
 import zipfile
+import shutil
 
 HERE=Path(__file__).resolve().parent
 WORK=Path(os.environ['RUNNER_TEMP'])/'omc-optimization-r20'
@@ -86,9 +87,59 @@ try:
         ok=ready and stage('technical-feature-regression',[sys.executable,'-m','unittest','discover',
             '-s','ai-training/tests','-p','test_technical_probability_precision.py'],source,timeout=120)
         raise SystemExit(0 if ok else 1)
+    if os.environ.get('OMC_R20_ENGINE_BASELINE')=='1':
+        expected=json.loads((HERE/'engine-baseline-input.json').read_bytes())
+        rows=[[p.relative_to(source).as_posix(),hashlib.sha256(p.read_bytes()).hexdigest()]
+              for p in sorted(source.rglob('*')) if p.is_file()]
+        rows.sort(key=lambda r:r[0])
+        digest=hashlib.sha256(json.dumps(rows,ensure_ascii=False,separators=(',',':')).encode('utf-8')).hexdigest()
+        if len(rows)!=expected['sourceFiles'] or digest!=expected['sourcePathSha256Digest']:
+            raise RuntimeError('FROZEN_COMPLETE_CLIENT_SOURCE_MISMATCH')
+        (REPORTS/'FROZEN_INPUTS.json').write_text(json.dumps({**expected,'verifiedSourcePathSha256Digest':digest,
+            'controlCommit':os.environ.get('GITHUB_SHA'),'productSourceRebuilt':False}),encoding='utf-8')
     npm='npm.cmd' if os.name=='nt' else 'npm'
     if not stage('dependencies',[npm,'ci','--ignore-scripts','--no-audit','--no-fund'],source,timeout=420):
         raise RuntimeError('DEPENDENCY_PREPARATION_FAILED')
+    if os.environ.get('OMC_R20_ENGINE_BASELINE')=='1':
+        frozen=WORK/'frozen-package.zip'
+        if not stage('immutable-engine-download',['node',str(HERE/'fetch-engine-baseline.mjs'),str(frozen)],timeout=600,private_env=True):
+            raise RuntimeError('IMMUTABLE_ENGINE_DOWNLOAD_FAILED')
+        frozen_dir=WORK/'frozen-cipher';frozen_dir.mkdir()
+        with zipfile.ZipFile(frozen) as z:
+            if set(z.namelist())!={'package.enc','PACKAGE_READY.json'} or len(z.infolist())!=2:
+                raise RuntimeError('IMMUTABLE_ENGINE_ARCHIVE_MEMBERS')
+            for item in z.infolist():
+                if item.is_dir() or item.file_size>804*1024**2:
+                    raise RuntimeError('IMMUTABLE_ENGINE_ARCHIVE_SIZE')
+                with z.open(item) as reader,(frozen_dir/item.filename).open('xb') as writer:
+                    shutil.copyfileobj(reader,writer,1024**2)
+        installer=WORK/'immutable-preview19.exe'
+        if not stage('immutable-engine-decrypt',['node',str(TRANSPORT),'decrypt','--input',str(frozen_dir/'package.enc'),
+            '--manifest',str(frozen_dir/'PACKAGE_READY.json'),'--id','pkg','--output',str(installer)],timeout=600,private_env=True):
+            raise RuntimeError('IMMUTABLE_ENGINE_AUTHENTICATION_FAILED')
+        def file_hash(file):
+            h=hashlib.sha256()
+            with file.open('rb') as stream:
+                for chunk in iter(lambda:stream.read(1024**2),b''):h.update(chunk)
+            return h.hexdigest()
+        expected_sha='daade4392f5b77262fbd1f53b4ffbcb89e73290952f1a0779739c0ff8d97eb27'
+        if installer.stat().st_size!=803348413 or file_hash(installer)!=expected_sha:
+            raise RuntimeError('IMMUTABLE_ENGINE_PLAINTEXT_IDENTITY')
+        # Only this VM job's reproducible transport copies. Preserve the
+        # immutable remote keeper and compact restoration/hash receipt.
+        cleanup=[]
+        for file in (frozen,frozen_dir/'package.enc'):
+            if file.is_symlink() or not file.is_file() or not file.resolve().is_relative_to(WORK.resolve()):
+                raise RuntimeError('OWNED_TRANSPORT_CLEANUP_BOUNDARY')
+            cleanup.append({'path':file.name,'bytes':file.stat().st_size,'sha256':file_hash(file),
+                'restorationArtifact':13402959173,'verifiedPlaintextKeeperSha256':expected_sha})
+            file.unlink()
+        (REPORTS/'OWNED_VM_TRANSPORT_REUSE.json').write_text(json.dumps(cleanup,indent=2),encoding='utf-8')
+        if shutil.disk_usage(WORK).free<2*1024**3:
+            raise RuntimeError('VM_DISK_FLOOR_BEFORE_ENGINE')
+        ok=stage('immutable-core-ai-1000-synthetic-baseline',['node',str(HERE/'probe-engine-baseline.mjs'),
+            str(source),str(installer),str(REPORTS/'native-engine-baseline')],source,timeout=2400)
+        raise SystemExit(0 if ok else 1)
     if os.environ.get('OMC_R20_RECOVERY_ONLY')=='1':
         checks=[stage('import-recovery-contracts',['node','--test','src/services/projectImportState.test.js',
             'src/services/partialImportState.test.js','src/services/photoSourceRecovery.test.js',
@@ -188,6 +239,9 @@ finally:
             'platform':sys.platform,'stages':stages,'memberPhotosUsed':os.environ.get('OMC_R20_NATIVE_UI')=='1',
             'realThousandPhotoQualified':False,'gpuPerformanceQualified':False,
             'installerBuilt':False,'published':False}
+    if os.environ.get('OMC_R20_ENGINE_BASELINE')=='1':
+        result['status']='PASS_IMMUTABLE_ENGINE_BASELINE_NOT_CURRENT_PRODUCT' if ok else 'FAIL_IMMUTABLE_ENGINE_BASELINE'
+        result['engineBaselineOnly']=True
     (REPORTS/'SUMMARY.json').write_text(json.dumps(result,indent=2)+'\n',encoding='utf-8')
     packed=WORK/'reports.zip'
     with zipfile.ZipFile(packed,'x',compression=zipfile.ZIP_DEFLATED) as z:

@@ -1,0 +1,11 @@
+{
+  "sourceTree": "bf9ae76b6d1cc29f24a7f71ae30b0b7dbcedd450",
+  "sourceFiles": 933,
+  "sourcePathSha256Digest": "02782afa9bf556b31be7d7c3323bbf8af8ec58d3092f49bf62af7aa435e2efbd",
+  "engineInstallerVersion": "1.0.21-preview.19",
+  "engineInstallerSha256": "daade4392f5b77262fbd1f53b4ffbcb89e73290952f1a0779739c0ff8d97eb27",
+  "actualModelHashes": "collected from the authenticated immutable payload in cloud",
+  "currentProductQualified": false,
+  "realPhotos": false,
+  "memberData": false
+}

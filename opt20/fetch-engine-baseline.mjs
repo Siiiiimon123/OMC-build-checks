@@ -1,0 +1,21 @@
+// Retrieve only the immutable previously built package; no product rebuild.
+import fs from 'node:fs';
+import crypto from 'node:crypto';
+import assert from 'node:assert/strict';
+import {Readable,Transform} from 'node:stream';
+import {pipeline} from 'node:stream/promises';
+assert(process.env.GITHUB_ACTIONS==='true'&&process.env.GITHUB_REPOSITORY==='Siiiiimon123/OMC-build-checks');
+assert(process.env.GITHUB_REF==='refs/heads/verify-optimization20'&&process.env.GITHUB_RUN_ATTEMPT==='1');
+delete process.env.OMC_PREVIEW15_TRANSPORT_KEY;
+const [output]=process.argv.slice(2);assert(output&&!fs.existsSync(output));
+const id=13402959173,bytes=803594126,sha='fe797487c19c48014add51b246b259d25df5695a7c42d0de2eed03f1cf9190ad';
+const token=process.env.GH_TOKEN;assert(token);delete process.env.GH_TOKEN;
+const endpoint='https://api.github.com/repos/Siiiiimon123/OMC-build-checks/actions/artifacts/'+id;
+const headers={Authorization:'Bearer '+token,Accept:'application/vnd.github+json'};
+const r=await fetch(endpoint,{headers,signal:AbortSignal.timeout(30000)});assert(r.ok,'FROZEN_ARTIFACT_METADATA');
+const meta=await r.json();assert(meta.id===id&&meta.size_in_bytes===bytes&&meta.digest==='sha256:'+sha&&!meta.expired,'FROZEN_ARTIFACT_IDENTITY');
+const response=await fetch(endpoint+'/zip',{headers,signal:AbortSignal.timeout(8*60*1000)});assert(response.ok&&response.body,'FROZEN_ARTIFACT_DOWNLOAD');
+let count=0;const h=crypto.createHash('sha256');
+await pipeline(Readable.fromWeb(response.body),new Transform({transform(chunk,enc,cb){count+=chunk.length;if(count>bytes)return cb(Error('FROZEN_ARTIFACT_SIZE'));h.update(chunk);cb(null,chunk);}}),fs.createWriteStream(output,{flags:'wx',mode:0o600}));
+assert(count===bytes&&h.digest('hex')===sha,'FROZEN_ARTIFACT_CONTENT');
+console.log(JSON.stringify({artifact:id,bytes,sha256:sha,productRebuilt:false}));
