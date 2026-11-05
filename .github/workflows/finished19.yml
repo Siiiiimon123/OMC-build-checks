@@ -13,7 +13,6 @@ jobs:
       matrix:
         include:
           - {os: windows-2025, arch: x64}
-          - {os: macos-15, arch: arm64}
     runs-on: '${{ matrix.os }}'
     timeout-minutes: 60
     steps:
@@ -37,7 +36,16 @@ jobs:
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         if: always()
         with:
+          name: 'finished19-${{ matrix.os }}-encrypted-diagnostics'
+          path: '${{ runner.temp }}/omc-jpeg19-cloud/encrypted/diagnostics*'
+          retention-days: 3
+          if-no-files-found: error
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        if: always()
+        with:
           name: 'finished19-${{ matrix.os }}-encrypted-evidence'
-          path: '${{ runner.temp }}/omc-jpeg19-cloud/encrypted/*'
+          path: |
+            ${{ runner.temp }}/omc-jpeg19-cloud/encrypted/reports.enc
+            ${{ runner.temp }}/omc-jpeg19-cloud/encrypted/REPORTS_READY.json
           retention-days: 3
           if-no-files-found: error

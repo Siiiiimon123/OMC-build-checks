@@ -7,6 +7,11 @@ import {createHash} from 'node:crypto';
 const delay=ms=>new Promise(r=>setTimeout(r,ms));
 const hash=b=>createHash('sha256').update(b).digest('hex');
 function check(v,m){if(!v)throw Error(m);}
+export function installExportPicker(output){
+ const {dialog}=process.mainModule.require('electron');
+ dialog.showOpenDialog=async(...args)=>{const options=args.at(-1);if(options?.title!=='选择导出位置'||!options.properties?.includes('openDirectory'))throw Error('UNREVIEWED_PICKER');return{canceled:false,filePaths:[output]};};
+ return true;
+}
 export async function runFinishedFlow({source,work,call,ev,until,click,snap,fixtures,restartApp}){
  check(process.env.GITHUB_ACTIONS==='true'&&['win32','darwin'].includes(process.platform),'CLOUD_DESKTOP_ONLY');
  const result={status:'RUNNING',nativeFolderPickerAdapter:true,osPickerManuallyTested:false,dbOrProjectFabrication:false,edits:{}};
@@ -49,8 +54,10 @@ export async function runFinishedFlow({source,work,call,ev,until,click,snap,fixt
   check(grid.length===fixtures.length&&(grid.length===1||!((grid[0].x<grid[1].x+grid[1].width&&grid[0].x+grid[0].width>grid[1].x)&&(grid[0].y<grid[1].y+grid[1].height&&grid[0].y+grid[0].height>grid[1].y))),'PHOTO_GRID_OVERLAP');result.grid={noOverlap:true,rectangles:grid};await snap('photo-grid');
   if(fixtures.length>1){
   progress('real-basic-grouping');
+  await page(async()=>{const {photoSelectionService}=await import('/src/services/photoSelectionService.js');const original=photoSelectionService.runBasicVisualGrouping;window.__omcBasicGroupingError=null;photoSelectionService.runBasicVisualGrouping=async(...args)=>{try{return await original(...args);}catch(error){window.__omcBasicGroupingError={code:String(error?.code??'UNSPECIFIED').slice(0,120),name:String(error?.name??'Error').slice(0,80)};throw error;}};return true;});
   await until('[...document.querySelectorAll(".basic-visual-grouping-panel button")].some(e=>!e.disabled&&e.innerText.trim()==="基础视觉分组，不含AI质量")');await click('基础视觉分组，不含AI质量');
-  await until('/已保存|基础运行已保存/.test(document.querySelector(".basic-visual-grouping-panel")?.innerText??"")',90000);
+  await until('Boolean(window.__omcBasicGroupingError)||/已保存|基础运行已保存/.test(document.querySelector(".basic-visual-grouping-panel")?.innerText??"")',90000);
+  result.basicGroupingError=await page(()=>window.__omcBasicGroupingError);check(!result.basicGroupingError,'ACTUAL_BASIC_GROUPING_FAILED:'+result.basicGroupingError?.code);
   await click('相似组');await until('Boolean(document.querySelector(".group-compare"))');
   const selected=await page(()=>{const c=document.querySelector('.gcp-card[aria-current=true]');return c?{name:c.querySelector('img')?.alt,label:c.getAttribute('aria-label')}:null;});check(selected?.name,'REAL_GROUP_NOT_FORMED');
   progress('group-adjust-and-crop');
@@ -75,8 +82,8 @@ export async function runFinishedFlow({source,work,call,ev,until,click,snap,fixt
   const output=path.join(work,'finished-export');fs.mkdirSync(output);
   progress('native-picker-adapter-and-formats');
   const log=fs.readFileSync(path.join(work,'evidence/source-app.log'),'utf8');const endpoint=[...log.matchAll(/Debugger listening on (ws:\/\/127\.0\.0\.1:\d+\/[^\s]+)/g)].at(-1)?.[1];check(endpoint,'MAIN_INSPECTOR_ENDPOINT');
-  mainWs=new WebSocket(endpoint);await new Promise((resolve,reject)=>{const t=setTimeout(()=>reject(Error('MAIN_INSPECTOR_CONNECT')),5000);mainWs.addEventListener('open',()=>{clearTimeout(t);resolve();},{once:true});mainWs.addEventListener('error',e=>{clearTimeout(t);reject(e);},{once:true});});mainWs.addEventListener('message',e=>{const m=JSON.parse(e.data),p=mp.get(m.id);if(p){clearTimeout(p.t);mp.delete(m.id);m.error?p.reject(Error('MAIN_PROTOCOL')):m.result?.exceptionDetails?p.reject(Error('MAIN_EVALUATION')):p.resolve(m.result?.result?.value);}});
-  const picker=await mainEval('('+((output)=>{const {dialog}=require('electron');dialog.showOpenDialog=async(...args)=>{const options=args.at(-1);if(options?.title!=='选择导出位置'||!options.properties?.includes('openDirectory'))throw Error('UNREVIEWED_PICKER');return{canceled:false,filePaths:[output]};};return true;}).toString()+')('+JSON.stringify(output)+')');check(picker,'PICKER_ADAPTER');
+  mainWs=new WebSocket(endpoint);await new Promise((resolve,reject)=>{const t=setTimeout(()=>reject(Error('MAIN_INSPECTOR_CONNECT')),5000);mainWs.addEventListener('open',()=>{clearTimeout(t);resolve();},{once:true});mainWs.addEventListener('error',e=>{clearTimeout(t);reject(e);},{once:true});});mainWs.addEventListener('message',e=>{const m=JSON.parse(e.data),p=mp.get(m.id);if(p){clearTimeout(p.t);mp.delete(m.id);m.error?p.reject(Error('MAIN_PROTOCOL')):m.result?.exceptionDetails?p.reject(Error('MAIN_EVALUATION:'+String(m.result.exceptionDetails.exception?.description??m.result.exceptionDetails.text).slice(0,1000))):p.resolve(m.result?.result?.value);}});
+  const picker=await mainEval('('+installExportPicker.toString()+')('+JSON.stringify(output)+')');check(picker,'PICKER_ADAPTER');
   await waitPage(()=>[...document.querySelectorAll('button')].some(e=>e.offsetWidth&&!e.disabled&&e.getAttribute('aria-label')==='导出选片'));await click('导出选片');await until('Boolean(document.querySelector("input[name=export-file-format][value=raw]"))');
   await page(()=>{document.querySelector('input[name=export-file-format][value=raw]').click();return true;});
   await waitPage(()=>document.querySelector('input[name=export-file-format][value=raw]')?.checked&&[...document.querySelectorAll('.export-dialog .dialog-actions button')].some(e=>e.classList.contains('primary-button')&&e.disabled));result.rawOnlyWithoutRawDisabled=true;
@@ -87,11 +94,12 @@ export async function runFinishedFlow({source,work,call,ev,until,click,snap,fixt
   const files=[];function walk(d){for(const e of fs.readdirSync(d,{withFileTypes:true})){const p=path.join(d,e.name);check(!e.isSymbolicLink(),'EXPORT_SYMLINK');if(e.isDirectory())walk(p);else files.push(p);}}walk(output);
   const require=createRequire(path.join(source,'package.json')),jpeg=require('jpeg-js');result.exported=[];
   progress('independent-jpeg-byte-check');
-  for(const file of files){if(!/\.jpe?g$/i.test(file)){check(/OMC-EXPORT-STATUS\.txt$/i.test(file),'UNEXPECTED_EXPORT_MEMBER');continue;}
+  for(const file of files){if(!/\.jpe?g$/i.test(file)){check(['OMC-EXPORT-STATUS.txt','OMC-EXPORT-STARTED.txt'].includes(path.basename(file)),'UNEXPECTED_EXPORT_MEMBER');continue;}
    const bytes=fs.readFileSync(file);check(!fixtures.some(f=>f.sha256===hash(bytes)),'ORIGINAL_JPEG_EXPORTED');const decoded=jpeg.decode(bytes,{useTArray:true,maxMemoryUsageInMB:1024});
    const input=fixtures.find(f=>path.basename(file).toLowerCase().includes(path.parse(f.path).name.toLowerCase()));check(input,'EXPORTED_SOURCE_MAPPING');const expected=result.edits[path.basename(input.path)]?.crop;check(expected&&expected.width===decoded.width&&expected.height===decoded.height&&Math.max(decoded.width,decoded.height)>1800,'FINISHED_JPEG_DIMENSIONS');
    result.exported.push({relativePath:path.relative(output,file),bytes:bytes.length,sha256:hash(bytes),width:decoded.width,height:decoded.height});
   }
+  const statusFile=files.find(file=>path.basename(file)==='OMC-EXPORT-STATUS.txt');check(statusFile&&/^状态：完整$/m.test(fs.readFileSync(statusFile,'utf8')),'PERSISTENT_EXPORT_NOT_COMPLETE');result.persistentExportStatusVerified=true;
   check(result.exported.length>=1&&result.exported.length<=fixtures.length,'FINISHED_JPEG_COUNT');result.originalsUnchanged=fixtures.every(f=>hash(fs.readFileSync(f.path))===f.sha256);check(result.originalsUnchanged,'ORIGINAL_CHANGED');result.status=fixtures.length>1?'PASS_SOURCE_FINISHED_JPEG_GROUP_AND_EXPORT':'PASS_SOURCE_FINISHED_JPEG_EXPORT';progress('done');return result;
  }catch(e){result.status='FAIL';result.error=String(e.stack||e);throw e;}
  finally{for(const p of mp.values()){clearTimeout(p.t);p.reject(Error('FLOW_FINISHED'));}mp.clear();try{mainWs?.close();}catch{}fs.writeFileSync(path.join(work,'evidence/FINISHED_FLOW.json'),JSON.stringify(result,null,2));}

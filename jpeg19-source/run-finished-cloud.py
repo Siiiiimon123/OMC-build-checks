@@ -85,9 +85,14 @@ finally:
  save(EVIDENCE/'SUMMARY.json',result)
  # Only ciphertext evidence is exposed to GitHub artifacts.
  encrypted=WORK/'encrypted';encrypted.mkdir(exist_ok=True);archive=WORK/'evidence.zip'
+ diagnostic=WORK/'diagnostics.zip'
+ with zipfile.ZipFile(diagnostic,'w',zipfile.ZIP_DEFLATED) as z:
+  for p in sorted(EVIDENCE.rglob('*')):
+   if p.is_file() and p.suffix in ('.json','.log') and p.stat().st_size<4*1024**2:z.write(p,p.relative_to(EVIDENCE).as_posix())
+ diagnostic_rc=run('encrypt-diagnostics',['node',str(HERE/'cloud-transport.mjs'),'encrypt',str(diagnostic),str(encrypted/'diagnostics.enc'),str(encrypted/'diagnostics-ready.json')],120,private=True)
  with zipfile.ZipFile(archive,'w',zipfile.ZIP_DEFLATED) as z:
   for p in sorted(EVIDENCE.rglob('*')):
    if p.is_file():z.write(p,p.relative_to(EVIDENCE).as_posix())
  rc=run('encrypt-evidence',['node',str(HERE/'cloud-transport.mjs'),'encrypt',str(archive),str(encrypted/'reports.enc'),str(encrypted/'REPORTS_READY.json')],120,private=True)
  print(json.dumps({'status':result['status'],'checks':result['checks'],'sourceTree':TREE,'encryptedEvidenceReady':rc==0}),flush=True)
-sys.exit(0 if result['status']=='PASS_SOURCE_FINISHED_FLOW' and rc==0 else 1)
+sys.exit(0 if result['status']=='PASS_SOURCE_FINISHED_FLOW' and rc==0 and diagnostic_rc==0 else 1)
