@@ -13,6 +13,7 @@ import subprocess
 import sys
 import traceback
 import zipfile
+import ast
 
 HERE = Path(__file__).resolve().parent
 WORK = Path(os.environ['RUNNER_TEMP']).resolve() / 'omc-final-package19'
@@ -119,6 +120,13 @@ def main():
             timeout=120, private=True)
         unzip(WORK / 'final-helpers.zip', inputs, limit=2 * 1024**2)
         shutil.copyfile(WORK / 'source19-records.plain', inputs / 'source19-records.json')
+        if sys.platform == 'win32':
+            # Parse the actual decrypted PowerShell files before large downloads.
+            ps = "$ErrorActionPreference='Stop';"
+            for file in inputs.glob('*.ps1'):
+                literal = str(file).replace("'", "''")
+                ps += "$t=$null;$e=$null;[void][System.Management.Automation.Language.Parser]::ParseFile('" + literal + "',[ref]$t,[ref]$e);if($e.Count){throw ($e|Out-String)};"
+            run('parse-native-install-helpers', ['powershell.exe', '-NoProfile', '-Command', ps], timeout=60)
         # The 1.06GB existing model transport is downloaded/decrypted only here.
         run('fetch-existing-model-transport', ['node', transport, 'fetch', '--manifest', HERE / 'RESOURCE_TRANSPORT.json',
             '--id', 'base', '--output', WORK / 'base.tar'], timeout=1200, private=True)
@@ -195,4 +203,16 @@ def main():
 
 
 if __name__ == '__main__':
-    sys.exit(main())
+    if sys.argv[1:] == ['--preflight']:
+        assert os.environ.get('GITHUB_ACTIONS') == 'true'
+        for file in HERE.glob('*.py'):
+            ast.parse(file.read_text(encoding='utf8'), filename=str(file))
+        for name in ('cloud-final-windows-build.cjs', 'cloud-final-installed.mjs',
+                     'cloud-final-flow.mjs', 'transport.cjs', 'bootstrap.cjs', 'contracts.cjs'):
+            file = HERE / name
+            assert file.is_file(), 'WORKFLOW_INPUT_MISSING:' + name
+            subprocess.run(['node', '--check', str(file)], check=True, timeout=30)
+        print('PASS_ALL_ACTUAL_CONTROLLER_PARSE_CHECKS')
+    else:
+        assert not sys.argv[1:]
+        sys.exit(main())

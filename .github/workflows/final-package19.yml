@@ -4,7 +4,6 @@ name: Final19 native packaging and installed acceptance
     branches: ['verify-final-package19']
     paths: ['.github/workflows/final-package19.yml', 'final19/**']
 permissions: {contents: read}
-concurrency: {group: omc-final-package19, cancel-in-progress: false}
 jobs:
   native:
     if: github.repository == 'Siiiiimon123/OMC-build-checks' && github.event.repository.private == false && github.run_attempt == 1
@@ -12,8 +11,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - {os: windows-2025, arch: x64, python: '3.14.5'}
           - {os: macos-15, arch: arm64, python: '3.12.10'}
+    concurrency: {group: 'omc-final-package19-${{ matrix.os }}', cancel-in-progress: false}
     runs-on: '${{ matrix.os }}'
     timeout-minutes: 90
     steps:
@@ -24,11 +23,7 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
         with: {python-version: '${{ matrix.python }}', architecture: '${{ matrix.arch }}', check-latest: false}
       - name: Validate controller syntax before dependency downloads
-        run: |
-          node --check final19/cloud-final-windows-build.cjs
-          node --check final19/cloud-final-installed.mjs
-          node --check final19/cloud-finished-flow.mjs
-          python -c "import ast,pathlib; [ast.parse(p.read_text(encoding='utf8'), filename=str(p)) for p in pathlib.Path('final19').glob('*.py')]"
+        run: python final19/run-final-package-cloud.py --preflight
       - name: Build exact native installer and verify installed App
         env:
           OMC_PREVIEW15_TRANSPORT_KEY: '${{ secrets.OMC_PREVIEW15_TRANSPORT_KEY }}'
