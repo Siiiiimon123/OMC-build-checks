@@ -138,7 +138,7 @@ def verify_new_program(old_exe, new_exe, source_entry, reports):
             ca, cb = marshal.loads(old.extract(name)), marshal.loads(new.extract(name))
             same = code_fingerprint(ca) == code_fingerprint(cb)
             if name == 'inference_server_onnx':
-                expected = compile(source_entry.read_text(encoding='utf8-sig'), str(source_entry), 'exec',
+                expected = compile(source_entry.read_bytes(), str(source_entry), 'exec',
                                    dont_inherit=True, optimize=0)
                 assert code_fingerprint(cb) == code_fingerprint(expected), 'COMPILED_ENTRY_IS_NOT_CURRENT_SOURCE'
                 assert not same, 'REBUILT_ENTRY_DID_NOT_CHANGE'

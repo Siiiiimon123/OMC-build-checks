@@ -14,7 +14,7 @@
   "automaticRerun": false,
   "stopRepeatingSuccessfulStage": true,
   "executed": {
-    "windows": 3,
+    "windows": 4,
     "mac": 2
   },
   "sameApprovedTwoPhotosOnly": true,
@@ -27,9 +27,9 @@
     "platforms": [
       "windows"
     ],
-    "windowsAttempt": 4,
-    "macBuildStoppedAfterSuccess": true,
-    "reason": "Fixed Python3.14 marshal code constant coverage; product source and dependencies unchanged"
+    "windowsAttempt": 5,
+    "reason": "Compile actual source bytes directly; no encoding alias conversion",
+    "macBuildStoppedAfterSuccess": true
   },
   "windowsSingleSupplement": {
     "approvalEvidence": "call_a228625569b145959fba4c83e1a3d487",
@@ -39,5 +39,22 @@
     "minutesEach": 90,
     "feeUSD": 0,
     "automaticRerun": false
+  },
+  "windowsRawSourceSupplement": {
+    "approvalEvidence": "call_6b45632226634cca836f235044de0202",
+    "verbatim": "\u5141\u8bb8\u6309\u6b64\u4e0a\u9650\u8865\u5b8c Windows",
+    "additionalWindowsRuns": 2,
+    "maximumTotalWindowsRunsAtThisCheckpoint": 6,
+    "minutesEach": 90,
+    "feeUSD": 0,
+    "automaticRerun": false
+  },
+  "sameScopeContinuation": {
+    "userInstruction": "\u8fd9\u79cd\u95ee\u9898\u540e\u9762\u4e0d\u7528\u6765\u95ee\u6211\uff0c\u6211\u90fd\u540c\u610f",
+    "scope": "Same repository, branch, Secret and existing source/sample scope; free standard Windows QA after reading actual reports and fixing scripts; successful stages stop",
+    "minutesEach": 90,
+    "feeUSD": 0,
+    "newModelsOrPhotosAuthorized": false,
+    "blindAutomaticRerun": false
   }
 }
