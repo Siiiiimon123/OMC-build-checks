@@ -14,7 +14,7 @@
   "automaticRerun": false,
   "stopRepeatingSuccessfulStage": true,
   "executed": {
-    "windows": 2,
+    "windows": 3,
     "mac": 2
   },
   "sameApprovedTwoPhotosOnly": true,
@@ -27,8 +27,17 @@
     "platforms": [
       "windows"
     ],
-    "windowsAttempt": 3,
+    "windowsAttempt": 4,
     "macBuildStoppedAfterSuccess": true,
-    "reason": "Read actual closure; exclude host DLL drift with real native/Python/stdlib identity proof and original-runtime byte retention"
+    "reason": "Fixed Python3.14 marshal code constant coverage; product source and dependencies unchanged"
+  },
+  "windowsSingleSupplement": {
+    "approvalEvidence": "call_a228625569b145959fba4c83e1a3d487",
+    "verbatim": "\u5141\u8bb8\u8865\u8fd91\u6b21 Windows \u9a8c\u6536",
+    "additionalWindowsRuns": 1,
+    "maximumTotalWindowsRuns": 4,
+    "minutesEach": 90,
+    "feeUSD": 0,
+    "automaticRerun": false
   }
 }

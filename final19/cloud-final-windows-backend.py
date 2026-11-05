@@ -82,7 +82,19 @@ def code_fingerprint(code):
         if isinstance(value, frozenset):
             return {'kind': 'frozenset', 'value': sorted((const(c) for c in value),
                     key=lambda c: json.dumps(c, sort_keys=True))}
-        assert value is None or value is Ellipsis or isinstance(value, (str, int, float, complex, bool))
+        if isinstance(value, slice):
+            return {'kind': 'slice', 'start': const(value.start), 'stop': const(value.stop), 'step': const(value.step)}
+        if isinstance(value, list):
+            return {'kind': 'list', 'value': [const(c) for c in value]}
+        if isinstance(value, set):
+            return {'kind': 'set', 'value': sorted((const(c) for c in value),
+                    key=lambda c: json.dumps(c, sort_keys=True))}
+        if isinstance(value, dict):
+            return {'kind': 'dict', 'value': sorted(([const(k), const(v)] for k, v in value.items()),
+                    key=lambda pair: json.dumps(pair[0], sort_keys=True))}
+        if value is StopIteration:
+            return {'kind': 'singleton', 'value': 'StopIteration'}
+        assert value is None or value is Ellipsis or isinstance(value, (str, int, float, complex, bool)), 'UNSUPPORTED_CODE_CONSTANT:' + type(value).__name__
         return {'kind': type(value).__name__, 'value': repr(value)}
     return hashlib.sha256(json.dumps(const(code), sort_keys=True, separators=(',', ':')).encode()).hexdigest()
 
