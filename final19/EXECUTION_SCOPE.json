@@ -14,7 +14,7 @@
   "automaticRerun": false,
   "stopRepeatingSuccessfulStage": true,
   "executed": {
-    "windows": 11,
+    "windows": 12,
     "mac": 2
   },
   "sameApprovedTwoPhotosOnly": true,
@@ -27,11 +27,11 @@
     "platforms": [
       "windows"
     ],
-    "windowsAttempt": 12,
-    "mode": "FROZEN_INSTALLER_SHORTCUT_DIFFERENTIAL_ONLY",
+    "windowsAttempt": 13,
+    "mode": "ACTUAL_UNICODE_SHORTCUT_LAUNCH_WITH_UNCHANGED_PAYLOAD_PROOF_REUSE",
     "artifact": 13402959173,
     "sha256": "daade4392f5b77262fbd1f53b4ffbcb89e73290952f1a0779739c0ff8d97eb27",
-    "reason": "Run42009299924 proves installed complete AI and all three JPEG/group/export cases pass. Real 2422-byte OMC desktop link has empty target/icon. Collect actual customInstall log and isolate native NSIS versus AUMI plugin versus current macro; no successful AI/JPEG repetition or product rebuild.",
+    "reason": "Run42012235349 differential proves Chinese and ASCII link binaries both retain correct target/icon while WScript returns blank only for Chinese names. Launch original installed Unicode desktop link through Windows Shell, verify loaded process/path/UI and Electron native readShortcutLink, then normal quit. Do not alter shortcut or rebuild product.",
     "approval": "User same-scope free continuation, no repeated questions",
     "macRebuilt": false
   },

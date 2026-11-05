@@ -191,6 +191,21 @@ def main():
             installed = installation['executable']
             result['firstInstallPayloadPassed'] = True
             result['shortcutBindingPassed'] = installation['shortcutBindingPassed']
+            if os.environ.get('OMC_SHORTCUT_LAUNCH_ONLY') == '1':
+                run('actual-native-unicode-shortcut-launch', ['node', HERE / 'cloud-shortcut-launch.mjs',
+                    evidence / 'FIRST_INSTALL.json', WORK / 'shortcut-launch', evidence], timeout=300)
+                native = json.loads((evidence / 'ACTUAL_DESKTOP_SHORTCUT_LAUNCH.json').read_bytes())
+                assert native['status'] == 'PASS_ACTUAL_UNICODE_DESKTOP_SHORTCUT_LAUNCH_AND_NATIVE_LINK_READ'
+                assert native['originalShortcutUnchanged'] is True and native['normalExitVerified'] is True
+                result.update(status='PASS_INSTALLED_NATIVE_SHORTCUT_WITH_PRIOR_UNCHANGED_PAYLOAD_FUNCTIONAL_PROOF',
+                    firstInstallPassed=True, shortcutBindingPassed=True,
+                    package={'bytes': package.stat().st_size, 'sha256': sha(package), 'name': package.name},
+                    inheritedFullAiAndJpegEvidence={'run': 42009299924, 'artifact': 13406632133,
+                        'artifactSha256': '6f85604e2145a7fa7a21dd6919688db49d2ab8429cfe00d426ecf30ce7a0024c',
+                        'sameInstallerSha256': current['sha256'], 'successfulStagesRepeated': False},
+                    firstInstallWScriptChinesePathProbeSupersededByActualNativeShellEvidence=True)
+                success = True
+                return 0
             if os.environ.get('OMC_SHORTCUT_DIAGNOSTIC') == '1':
                 for log in Path(os.environ['TEMP']).glob('omc-preview16-shortcut-*.log'):
                     shutil.copyfile(log, evidence / log.name)
@@ -282,7 +297,7 @@ if __name__ == '__main__':
         for file in HERE.glob('*.py'):
             ast.parse(file.read_text(encoding='utf8'), filename=str(file))
         for name in ('cloud-final-windows-build.cjs', 'cloud-final-installed.mjs',
-                     'cloud-final-flow.mjs', 'cloud-shortcut-probe.cjs', 'transport.cjs', 'bootstrap.cjs', 'contracts.cjs'):
+                     'cloud-final-flow.mjs', 'cloud-shortcut-probe.cjs', 'cloud-shortcut-launch.mjs', 'transport.cjs', 'bootstrap.cjs', 'contracts.cjs'):
             file = HERE / name
             assert file.is_file(), 'WORKFLOW_INPUT_MISSING:' + name
             subprocess.run(['node', '--check', str(file)], check=True, timeout=30)

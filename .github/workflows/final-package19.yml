@@ -24,13 +24,13 @@ jobs:
         with: {python-version: '${{ matrix.python }}', architecture: '${{ matrix.arch }}', check-latest: false}
       - name: Validate controller syntax before dependency downloads
         run: python final19/run-final-package-cloud.py --preflight
-      - name: Diagnose installed shortcut using exact frozen Windows19
+      - name: Launch actual Unicode desktop shortcut for frozen Windows19
         env:
           OMC_PREVIEW15_TRANSPORT_KEY: '${{ secrets.OMC_PREVIEW15_TRANSPORT_KEY }}'
           PYTHONDONTWRITEBYTECODE: '1'
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
           OMC_ACCEPT_EXISTING_WINDOWS: '1'
-          OMC_SHORTCUT_DIAGNOSTIC: '1'
+          OMC_SHORTCUT_LAUNCH_ONLY: '1'
           GH_TOKEN: '${{ github.token }}'
         run: python final19/run-final-package-cloud.py
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
