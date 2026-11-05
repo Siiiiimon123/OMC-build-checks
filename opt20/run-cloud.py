@@ -101,6 +101,14 @@ try:
     if not stage('dependencies',[npm,'ci','--ignore-scripts','--no-audit','--no-fund'],source,timeout=420):
         raise RuntimeError('DEPENDENCY_PREPARATION_FAILED')
     if os.environ.get('OMC_R20_ENGINE_BASELINE')=='1':
+        if os.environ.get('OMC_R20_CHANGED_BATCHER')=='1':
+            checks=[stage('changed-batcher-contracts',['node','--test','src/services/microBatcher.test.js',
+                'src/services/ai/modelLoaderBatch.test.js','src/services/ai/analysisIntegrityRegression.test.js',
+                'src/services/ai/enhancedAnalysisTermination.test.js','src/services/analysisPerformance.test.js'],source)]
+            checks.extend([stage('core',[npm,'run','test:core'],source),
+                stage('browser-preview',[npm,'run','test:browser-preview'],source),
+                stage('build-browser-preview',[npm,'run','build:browser-preview'],source)])
+            if not all(checks):raise RuntimeError('CHANGED_BATCHER_REGRESSION_FAILED')
         frozen=WORK/'frozen-package.zip'
         if not stage('immutable-engine-download',['node',str(HERE/'fetch-engine-baseline.mjs'),str(frozen)],timeout=600,private_env=True):
             raise RuntimeError('IMMUTABLE_ENGINE_DOWNLOAD_FAILED')

@@ -101,6 +101,7 @@ try{
  globalThis.window={electronAPI:{getAiServiceStatus:async()=>({port,token})}};
  const client=await import(pathToFileURL(path.join(source,'src/services/ai/modelLoader.js')).href);
  report.clientSha256=hash(fs.readFileSync(path.join(source,'src/services/ai/modelLoader.js')));
+ report.microBatcherSha256=hash(fs.readFileSync(path.join(source,'src/services/microBatcher.js')));
  await client.checkApiServer();assert(client.isApiServerAvailable(),'CURRENT_CLIENT_DID_NOT_ACCEPT_ACTUAL_HEALTH');
  globalThis.fetch=async(input,options)=>{
   const route=new URL(typeof input==='string'?input:input.url).pathname;
