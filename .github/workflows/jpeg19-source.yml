@@ -9,7 +9,7 @@ jobs:
   native:
     if: github.repository == 'Siiiiimon123/OMC-build-checks' && github.event.repository.private == false && github.run_attempt == 1
     runs-on: windows-2025
-    timeout-minutes: 40
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with: {persist-credentials: false, fetch-depth: 1}
@@ -17,7 +17,7 @@ jobs:
         with: {node-version: '24.19.0', architecture: x64, check-latest: false, package-manager-cache: false}
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
         with: {python-version: '3.12.10', architecture: x64, check-latest: false}
-      - name: Source and synthetic large JPEG acceptance on VM
+      - name: Source, synthetic and authorized real JPEG acceptance on VM
         env:
           OMC_PREVIEW15_TRANSPORT_KEY: '${{ secrets.OMC_PREVIEW15_TRANSPORT_KEY }}'
           PYTHONDONTWRITEBYTECODE: '1'

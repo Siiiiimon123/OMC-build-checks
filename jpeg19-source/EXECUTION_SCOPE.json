@@ -1,22 +1,24 @@
 {
-  "schema": "omc-cloud-execution-scope-v1",
-  "authorization": "User explicitly requested cloud or GitHub VM validation instead of local validation, 2026-11-05",
-  "stage": "source-functional-before-packaging",
-  "branch": "verify-jpeg19-cloud",
+  "schema": "omc-cloud-execution-scope-v2",
+  "authorization": "User requested cloud/GitHub validation, and explicitly approved two JPEG originals in call_0c6b1e5e82374bfa81e789eef93720bc",
   "sourceTree": "1e39b9ae2921480b27d4a1a8bf5f8499004886fa",
-  "runs": 1,
-  "timeoutMinutes": 40,
   "costLimitUSD": 0,
-  "syntheticOnly": true,
-  "memberPhotoUpload": false,
+  "runTimeoutMinutes": 60,
+  "automaticRerun": false,
+  "publicContent": "generic harness plus authenticated encrypted source/records and exactly two approved JPEG originals; no plaintext product source or photos",
+  "secrets": "Reuse existing data transport secret only; removed from product/test child environment",
+  "priorFailures": [
+    {
+      "run": 41883754081,
+      "stage": "source TLS handshake reset; checks empty"
+    },
+    {
+      "run": 41883937874,
+      "stage": "source TLS handshake reset; checks empty"
+    }
+  ],
+  "nextRun": "One corrected cloud run using Git-hosted ciphertext, with proper existing transport AAD and actual embedded viewer selectors",
   "productionChange": false,
   "mainChange": false,
-  "automaticRerun": false,
-  "privateInputs": "authenticated encrypted source and source byte records only",
-  "evidence": "AES-256-GCM encrypted reports only",
-  "limitations": [
-    "Not installed-package acceptance",
-    "Not full AI acceptance",
-    "Real-photo upload awaits separate consent"
-  ]
+  "installerAcceptance": false
 }

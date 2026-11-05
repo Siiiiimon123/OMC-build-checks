@@ -38,14 +38,14 @@ try:
  cfg=json.loads((HERE/'INPUT.json').read_text())
  for asset in cfg['assets']:
   target=WORK/(asset['id']+'.enc');meta=WORK/(asset['id']+'.json');plain=WORK/(asset['id']+'.plain');save(meta,asset)
-  with urllib.request.urlopen(asset['url'],timeout=60) as response,target.open('xb') as f:
-   assert response.url==asset['url'];count=0;deadline=time.monotonic()+180
-   while True:
-    b=response.read(1024*1024)
-    if not b:break
-    count+=len(b);assert count<=asset['ciphertextBytes'] and time.monotonic()<deadline;f.write(b)
-  assert count==asset['ciphertextBytes']
+  # Authenticated ciphertext travels in this Git checkout, avoiding a failing source TLS path.
+  parts=sorted((HERE/'inputs'/asset['id']).glob('*.enc'));assert len(parts)==(asset['ciphertextBytes']+65535)//65536
+  with target.open('xb') as f:
+   for i,p in enumerate(parts):
+    assert p.name==str(i).zfill(4)+'.enc';f.write(p.read_bytes())
+  assert target.stat().st_size==asset['ciphertextBytes']
   assert run('decrypt-'+asset['id'],['node',str(HERE/'cloud-transport.mjs'),'decrypt',str(target),str(plain),str(meta)],private=True)==0
+  if asset['id'].startswith('sample-'):result['originalPhotosTransferred']=True;result['syntheticOnly']=False
  records=json.loads((WORK/'source19-records.plain').read_bytes())['records'];assert len(records)==932 and git_tree(records)==TREE
  source=WORK/'source';source.mkdir();by={r['path']:r for r in records}
  with zipfile.ZipFile(WORK/'source19.plain') as z:
@@ -60,7 +60,14 @@ try:
  for name,cmd in [('core',['npm.cmd','run','test:core']),('browser-preview',['npm.cmd','run','test:browser-preview']),('vite-build',['node','node_modules/vite/bin/vite.js','build','--outDir',str(WORK/'frontend/dist')])]:
   result['checks'][name]=run(name,cmd,900,source)
  assert run('electron-install',['node','node_modules/electron/install.js'],600,source)==0
- result['checks']['jpeg-native-source']=run('jpeg-native-source',['node',str(HERE/'cloud-jpeg.mjs'),str(source),str(WORK)],900,source)
+ for identity in ('synthetic','sample-a','sample-b'):
+  native=WORK/('native-'+identity);native.mkdir()
+  args=['node',str(HERE/'cloud-jpeg.mjs'),str(source),str(native)]
+  if identity!='synthetic':args.append(str(WORK/(identity+'.plain')))
+  result['checks']['jpeg-'+identity]=run('jpeg-'+identity,args,900,source)
+  import shutil
+  shutil.copytree(native/'evidence',EVIDENCE/('native-'+identity))
+ result['syntheticOnly']=False;result['originalPhotosTransferred']=True
  changed=[]
  for r in records:
   if sha((source/r['path']).read_bytes())!=r['sha256']:changed.append(r['path'])

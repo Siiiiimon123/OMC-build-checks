@@ -1,6 +1,7 @@
 {
   "schema": "omc-cloud-source-input-v1",
   "sourceTree": "1e39b9ae2921480b27d4a1a8bf5f8499004886fa",
+  "transport": "git-checkout-authenticated-ciphertext",
   "assets": [
     {
       "id": "source19",
@@ -9,8 +10,7 @@
       "ciphertextBytes": 2650087,
       "nonceHex": "b0264b74fc3b7a0fa7d1723a",
       "ciphertextSha256": "1e3f58d472b10ede5925840e9f8203c7e7f0e17c1d1db451ed1577af95cd891b",
-      "tagHex": "8e486201e3f58d932538e1257e37e663",
-      "url": "https://omc.xiaoa.cyou/updates/build-inputs/1e3f58d472b10ede5925840e9f8203c7e7f0e17c1d1db451ed1577af95cd891b.jpeg19.enc"
+      "tagHex": "8e486201e3f58d932538e1257e37e663"
     },
     {
       "id": "source19-records",
@@ -19,8 +19,25 @@
       "ciphertextBytes": 199394,
       "nonceHex": "c9dc2f9bef953771f5b33c2e",
       "ciphertextSha256": "f2dfa1a06952e01637334690de4a9dd80cf505690c66f95b519f8cfe5c74033d",
-      "tagHex": "b0ff74fc94b6f750e1ff1b4ef41f4501",
-      "url": "https://omc.xiaoa.cyou/updates/build-inputs/f2dfa1a06952e01637334690de4a9dd80cf505690c66f95b519f8cfe5c74033d.jpeg19.enc"
+      "tagHex": "b0ff74fc94b6f750e1ff1b4ef41f4501"
+    },
+    {
+      "id": "sample-a",
+      "plaintextBytes": 2534841,
+      "plaintextSha256": "f959a2cf7a3a787934a669dfde25ba112dec5d65f5086c77b26aad80ea664959",
+      "ciphertextBytes": 2534841,
+      "nonceHex": "45b8c440f6abfdb76be282c3",
+      "ciphertextSha256": "0a8c43f6cbebd32834a4734e3db3590c2775363e28006716111f303729c04ed3",
+      "tagHex": "e8b674a57434ff55627ff45ea62887f2"
+    },
+    {
+      "id": "sample-b",
+      "plaintextBytes": 5157560,
+      "plaintextSha256": "54f911884c2c28e7c4d9a706e0ae0675949fc8d6a249a4b9575934fbcad34314",
+      "ciphertextBytes": 5157560,
+      "nonceHex": "61cb1f10ed3275d3cb0388ce",
+      "ciphertextSha256": "1a4c6d454abedad80d2854cbd96e7bd0aed45991fc7defde4887961f251b6f6a",
+      "tagHex": "55f6d3223fa6eabc318778f98a60f866"
     }
   ]
 }
