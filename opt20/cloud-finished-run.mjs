@@ -75,7 +75,9 @@ try{
     }return result;
    };return true;
   })()`);
-  await ev(`(()=>{document.querySelector('input[type="range"][aria-label="饱和度百分比"]').focus();return true})()`);
+  await ev(`(()=>{const e=document.querySelector('input[type="range"][aria-label="饱和度百分比"]'),group=e.closest('details');if(!group.open)group.querySelector('summary').click();return true})()`);
+  await until('document.querySelector(\'input[type="range"][aria-label="饱和度百分比"]\')?.offsetWidth>0');
+  assert(await ev(`(()=>{const e=document.querySelector('input[type="range"][aria-label="饱和度百分比"]');e.scrollIntoView({block:'center'});e.focus();return document.activeElement===e})()`),'VISIBLE_SATURATION_CONTROL_FOCUS');
   for(const type of ['keyDown','keyUp'])await call('Input.dispatchKeyEvent',{type,key:'ArrowRight',code:'ArrowRight',windowsVirtualKeyCode:39});
   await until('window.__r20Held.ready',120000);
   const held=await ev('window.__r20Held');
