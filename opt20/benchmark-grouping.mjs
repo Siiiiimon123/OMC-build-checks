@@ -1,13 +1,14 @@
 // Frozen production-before/after comparison; no photo or model inference.
 import fs from 'node:fs';
-import vm from 'node:vm';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 const [source,baselineFile,output]=process.argv.slice(2);
 const text=fs.readFileSync(baselineFile,'utf8');
 const match=text.match(/export function hammingDistance\([\s\S]*?\n\}/);
 if(!match)throw Error('FROZEN_BASELINE_FUNCTION_MISSING');
-const before=vm.runInNewContext('('+match[0].replace(/^export /,'')+')');
+// Both implementations execute in this realm as ESM. A VM context gives
+// built-ins a different optimization boundary and distorts the comparison.
+const {hammingDistance:before}=await import('data:text/javascript;base64,'+Buffer.from(match[0]).toString('base64'));
 const {hammingDistance:after}=await import(pathToFileURL(path.join(source,'src/services/imageAnalyzer.js')).href);
 let seed=17n;const hashes=Array.from({length:1000},()=>{
  seed=BigInt.asUintN(64,seed*6364136223846793005n+1442695040888963407n);return seed.toString(16).padStart(16,'0');

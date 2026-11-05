@@ -88,6 +88,7 @@ try:
         'src/services/jpegPreviewRenderer.test.js','src/workers/jpegAdjustmentPreview.worker.test.js',
         'src/services/ai/enhancedAnalysisTermination.test.js','src/services/ai/analysisIntegrityRegression.test.js',
         'src/services/ai/modelLoaderBatch.test.js','src/services/imageAnalyzer.test.js']
+    timing_only=os.environ.get('OMC_R20_TIMING_ONLY')=='1'
     native_ui=os.environ.get('OMC_R20_NATIVE_UI')=='1'
     if native_ui:
         # The prior frozen source passed full regressions. Only the additional
@@ -110,7 +111,9 @@ try:
                 '-s','ai-training/tests','-p','test_technical_probability_precision.py'],source))
         else:
             checks.append(False)
-    if (HERE/'readout-input.json').exists() and all(checks):
+    if timing_only and all(checks):
+        checks.append(stage('fair-grouping-kernel-benchmark',['node',str(HERE/'benchmark-grouping.mjs'),str(source),str(WORK/'baseline-imageAnalyzer.js'),str(REPORTS/'GROUPING_KERNEL_BENCH.json')],timeout=120))
+    if not timing_only and (HERE/'readout-input.json').exists() and all(checks):
         checks.append(stage('grouping-kernel-benchmark',['node',str(HERE/'benchmark-grouping.mjs'),
             str(source),str(WORK/'baseline-imageAnalyzer.js'),str(REPORTS/'GROUPING_KERNEL_BENCH.json')],timeout=120))
         checks.append(stage('prior-native-evidence-readout',['node',str(HERE/'thin-evidence.cjs'),
@@ -138,7 +141,7 @@ try:
             if not stage('authenticate-'+asset['id'],['node',str(TRANSPORT),'decrypt','--input',str(cipher),
                 '--manifest',str(manifest),'--id',asset['id'],'--output',str(WORK/(asset['id']+'.jpg'))],private_env=True):
                 raise RuntimeError('PHOTO_AUTHENTICATION_FAILED')
-        for identity in ('sample-a','sample-b','synthetic'):
+        for identity in (('sample-b',) if timing_only else ('sample-a','sample-b','synthetic')):
             case=REPORTS/('native-'+identity);case.mkdir()
             child_env['OMC_R20_VIEWPORT']='compact' if identity=='sample-a' else 'wide'
             command=['node',str(HERE/'cloud-finished-run.mjs'),str(source),str(case)]
@@ -147,7 +150,7 @@ try:
             checks.append(stage('native-'+identity,command,source,timeout=420))
             if not checks[-1]:
                 break
-        if os.name=='nt' and all(checks):
+        if not timing_only and os.name=='nt' and all(checks):
             case=REPORTS/'native-stress';case.mkdir()
             child_env['OMC_R20_VIEWPORT']='compact'
             checks.append(stage('native-stress',['node',str(HERE/'cloud-stress-run.mjs'),str(source),str(case)],source,timeout=840))
