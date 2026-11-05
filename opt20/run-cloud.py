@@ -94,7 +94,8 @@ try:
         # The prior frozen source passed full regressions. Only the additional
         # viewport policy changed; test that delta and the real native flow.
         targeted=['src/services/jpegExposureService.test.js','src/services/jpegExposureServiceV2.test.js',
-                  'src/services/jpegPreviewRenderer.test.js','src/services/savedAdjustmentPreview.test.js']
+                  'src/services/jpegPreviewRenderer.test.js','src/services/savedAdjustmentPreview.test.js',
+                  'src/services/automaticAdjustmentPreview.test.js','src/services/adjustmentWorkspacePresentation.test.js']
     checks=[stage('targeted',['node','--test',*targeted],source)]
     if not native_ui:
         checks.extend([stage('core',[npm,'run','test:core'],source),
@@ -111,7 +112,7 @@ try:
                 '-s','ai-training/tests','-p','test_technical_probability_precision.py'],source))
         else:
             checks.append(False)
-    if timing_only and all(checks):
+    if timing_only and not os.environ.get('OMC_R20_FAST_DISPLAY') and all(checks):
         checks.append(stage('fair-grouping-kernel-benchmark',['node',str(HERE/'benchmark-grouping.mjs'),str(source),str(WORK/'baseline-imageAnalyzer.js'),str(REPORTS/'GROUPING_KERNEL_BENCH.json')],timeout=120))
     if not timing_only and (HERE/'readout-input.json').exists() and all(checks):
         checks.append(stage('grouping-kernel-benchmark',['node',str(HERE/'benchmark-grouping.mjs'),

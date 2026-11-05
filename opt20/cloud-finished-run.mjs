@@ -63,10 +63,26 @@ try{
  report.initial=await ev('(()=>{const s=document.querySelector(".exposure-dialog");return {quality:s.dataset.previewQuality,images:[...document.querySelectorAll(".single-photo-view .highres-viewer[data-adjustment-preview=effect] img")].map(i=>({width:i.naturalWidth,height:i.naturalHeight,complete:i.complete})),alerts:[...s.querySelectorAll("[role=alert]")].map(e=>e.innerText)}})()');report.initial.pixels=await ev(pixelsExpression);assert(!report.initial.alerts.length,'INITIAL_PREVIEW_ERROR');assert(report.initial.images.some(i=>i.width>0),'INITIAL_PREVIEW_EMPTY');await snap('initial-refined');
  report.stage='drag';
  const bounds=await ev(`(()=>{const e=document.querySelector('input[type="range"][aria-label="曝光 EV"]');e.scrollIntoView({block:"center"});const r=e.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height,min:Number(e.min),max:Number(e.max)}})()`);
- await ev('(()=>{window.__omcCloudFrames=[];const s=document.querySelector(".exposure-dialog");window.__omcCloudObserver=new MutationObserver(()=>{if(window.__omcCloudFrames.length<2000)window.__omcCloudFrames.push({at:performance.now(),quality:s.dataset.previewQuality,feedback:s.dataset.previewFeedbackMs,timing:JSON.parse(s.dataset.previewTiming??"null"),images:[...document.querySelectorAll(".single-photo-view .highres-viewer[data-adjustment-preview=effect] img")].map(i=>i.currentSrc.slice(-100))})});window.__omcCloudObserver.observe(document.body,{subtree:true,attributes:true,attributeFilter:["src","data-preview-feedback-ms","data-preview-quality","data-preview-timing"]});return true})()');
+ await ev('(()=>{window.__omcCloudFrames=[];const s=document.querySelector(".exposure-dialog");window.__omcCloudObserver=new MutationObserver(()=>{if(window.__omcCloudFrames.length<2000)window.__omcCloudFrames.push({at:performance.now(),quality:s.dataset.previewQuality,backend:s.dataset.previewBackend,liveDraft:s.dataset.previewLiveDraft,feedback:s.dataset.previewFeedbackMs,timing:JSON.parse(s.dataset.previewTiming??"null"),images:[...document.querySelectorAll(".single-photo-view .highres-viewer[data-adjustment-preview=effect] img")].map(i=>i.currentSrc.slice(-100))})});window.__omcCloudObserver.observe(document.body,{subtree:true,attributes:true,attributeFilter:["src","data-preview-feedback-ms","data-preview-quality","data-preview-timing","data-preview-live-draft"]});return true})()');
+ const screenshotPixels=async()=>{
+  const clip=await ev('(()=>{const i=document.querySelector(".single-photo-view .highres-viewer[data-adjustment-preview=effect] img"),r=i.getBoundingClientRect();return{x:r.x+r.width/2-48,y:r.y+r.height/2-48,width:96,height:96,scale:1}})()');
+  assert(clip.x>=0&&clip.y>=0,'SCREEN_CLIP_VISIBLE');
+  const shot=await call('Page.captureScreenshot',{format:'jpeg',quality:100,clip,captureBeyondViewport:false});
+  const d=jpeg.decode(Buffer.from(shot.data,'base64'),{useTArray:true});let sum=0;
+  for(let k=0;k<d.data.length;k++)if(k%4!==3)sum+=d.data[k];
+  return{mean:sum/(d.width*d.height*3),sha256:hash(Buffer.from(shot.data,'base64'))};
+ };
+ if(process.env.OMC_R20_FAST_DISPLAY==='1')report.screenBefore=await screenshotPixels();
  const y=bounds.y+bounds.height/2,x0=bounds.x+bounds.width*.55,x1=bounds.x+bounds.width*.7;
  await call('Input.dispatchMouseEvent',{type:'mousePressed',x:x0,y,button:'left',buttons:1,clickCount:1});
- for(let i=0;i<60;i++){await call('Input.dispatchMouseEvent',{type:'mouseMoved',x:x0+(x1-x0)*i/59,y,button:'left',buttons:1});await delay(70);}
+ for(let i=0;i<60;i++){await call('Input.dispatchMouseEvent',{type:'mouseMoved',x:x0+(x1-x0)*i/59,y,button:'left',buttons:1});await delay(70);
+  if(process.env.OMC_R20_FAST_DISPLAY==='1'&&i===45){
+   report.screenDuring=await screenshotPixels();
+   report.liveSaveDisabled=await ev('[...document.querySelectorAll(".exposure-dialog button")].some(b=>b.getAttribute("aria-label")?.startsWith("保存")&&b.disabled)');
+   assert(report.liveSaveDisabled,'DISPLAY_FILTER_MUST_NOT_AUTHORIZE_SAVE');
+   assert(report.screenDuring.mean>report.screenBefore.mean+1,'VISIBLE_SCREEN_PIXELS_DID_NOT_CHANGE');
+  }
+ }
  report.frames=await ev('window.__omcCloudFrames');
  await call('Input.dispatchMouseEvent',{type:'mouseReleased',x:x1,y,button:'left',buttons:0,clickCount:1});
  report.interactiveCommits=report.frames.filter(f=>f.quality==='interactive').length;assert(report.interactiveCommits>0,'NO_INTERMEDIATE_FEEDBACK_DURING_DRAG');
