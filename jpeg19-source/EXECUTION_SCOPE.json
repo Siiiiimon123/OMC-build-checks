@@ -1,18 +1,26 @@
 {
-  "schema": "omc-cloud-execution-scope-mac-v1",
-  "authorization": "call_0c6b1e5e82374bfa81e789eef93720bc; same card allows at most two Mac jobs",
-  "macRun": 1,
-  "maxMacRuns": 2,
-  "timeoutMinutes": 90,
+  "schema": "omc-cloud-execution-scope-windows-completion-v1",
+  "authorization": "call_dd5fa76dc5c643a3aa6595a34e1e446e",
+  "additionalWindowsRun": 1,
+  "maxAdditionalWindowsRuns": 2,
+  "timeoutMinutes": 60,
   "costLimitUSD": 0,
   "automaticRerun": false,
+  "stopRepeatedPlatformRunsOnPass": true,
   "sourceTree": "1e39b9ae2921480b27d4a1a8bf5f8499004886fa",
+  "sharedHarnessPreflightPassed": {
+    "platform": "macOS Apple Silicon",
+    "run": 41952945441,
+    "job": 127000922487
+  },
+  "sourceChecks": {
+    "run": 41950689366,
+    "core": 346,
+    "browserPreview": 9,
+    "viteBuildPassed": true
+  },
   "sameApprovedTwoPhotos": true,
-  "encryptedGitInputs": true,
-  "sharedHarnessPreflightBeforeProduct": true,
-  "sourceAppOnly": true,
-  "installedPackageTested": false,
-  "aiTested": false,
+  "noNewModelOrSecret": true,
   "productionChange": false,
-  "mainChange": false
+  "installedPackageTested": false
 }
