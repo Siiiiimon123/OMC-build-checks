@@ -80,6 +80,12 @@ try:
                 if hashlib.sha256(data).hexdigest()!=row['sha256']:
                     raise RuntimeError('OVERLAY_BYTES_MISMATCH')
                 target.write_bytes(data)
+    if os.environ.get('OMC_R20_PYTHON_ONLY')=='1':
+        ready=stage('python-dependency',[sys.executable,'-m','pip','install','--disable-pip-version-check',
+            '--no-cache-dir','numpy==2.5.0rc1'],timeout=180)
+        ok=ready and stage('technical-feature-regression',[sys.executable,'-m','unittest','discover',
+            '-s','ai-training/tests','-p','test_technical_probability_precision.py'],source,timeout=120)
+        raise SystemExit(0 if ok else 1)
     npm='npm.cmd' if os.name=='nt' else 'npm'
     if not stage('dependencies',[npm,'ci','--ignore-scripts','--no-audit','--no-fund'],source,timeout=420):
         raise RuntimeError('DEPENDENCY_PREPARATION_FAILED')
@@ -176,7 +182,14 @@ finally:
             # fixture copies. Existing full artifacts remain available.
             root_log=len(rel.parts)==1 and file.suffix in ('.log','.json')
             readout=len(rel.parts)>1 and rel.parts[0].startswith('readout-')
-            native=len(rel.parts)>=3 and rel.parts[0].startswith('native-') and rel.parts[1]=='evidence' and file.suffix=='.json'
+            native_json=len(rel.parts)>=3 and rel.parts[0].startswith('native-') and rel.parts[1]=='evidence' and file.suffix=='.json'
+            # At the next independently necessary UI stage retain a bounded,
+            # explicit screenshot set in this encrypted artifact. Do not rerun
+            # already passed workflows merely to manufacture screenshots.
+            native_png=(len(rel.parts)==3 and rel.parts[0].startswith('native-') and rel.parts[1]=='evidence'
+                and file.name in {'adjusted-refined.png','photo-grid.png','group-crop.png'}
+                and file.stat().st_size<=4*1024*1024)
+            native=native_json or native_png
             if root_log or readout or native:
                 z.write(file,rel.as_posix())
     subprocess.run(['node',str(TRANSPORT),'encrypt','--input',str(packed),
