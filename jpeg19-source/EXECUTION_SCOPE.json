@@ -1,18 +1,31 @@
 {
-  "schema": "omc-cloud-execution-scope-mac-v1",
-  "authorization": "call_0c6b1e5e82374bfa81e789eef93720bc; same card allows at most two Mac jobs",
-  "macRun": 1,
+  "schema": "omc-cloud-execution-scope-mac-v2",
+  "authorization": "call_0c6b1e5e82374bfa81e789eef93720bc; at most two Mac runs",
+  "macRun": 2,
   "maxMacRuns": 2,
   "timeoutMinutes": 90,
   "costLimitUSD": 0,
   "automaticRerun": false,
   "sourceTree": "1e39b9ae2921480b27d4a1a8bf5f8499004886fa",
-  "sameApprovedTwoPhotos": true,
-  "encryptedGitInputs": true,
-  "sharedHarnessPreflightBeforeProduct": true,
+  "priorMacRun": 41952945441,
+  "sourceChecks": {
+    "corePassed": 346,
+    "browserPreviewPassed": 9,
+    "viteBuildPassed": true,
+    "guiDriverTimedOut": true,
+    "timeoutRootCauseNotConfirmed": true
+  },
+  "changes": [
+    "Persist each stage and pre-cleanup result",
+    "Reuse existing Browser.close and bounded owned-process fallback",
+    "Bound CDP connection and driver execution",
+    "Collect GUI evidence even after timeout"
+  ],
+  "sameSourceAndTwoPhotos": true,
+  "noNewModelOrSecret": true,
   "sourceAppOnly": true,
   "installedPackageTested": false,
-  "aiTested": false,
+  "normalExitQualification": false,
   "productionChange": false,
   "mainChange": false
 }

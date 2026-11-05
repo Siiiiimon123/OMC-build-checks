@@ -60,15 +60,13 @@ try:
  assert run('npm-ci',[npm,'ci','--ignore-scripts','--no-audit','--no-fund'],900,source)==0
  # Exact unchanged source already passed these on VM41950689366; do not repeat.
  if sys.platform=='win32':result['priorExactSourceChecks']={'run':41950689366,'sourceTree':TREE,'corePassed':346,'browserPreviewPassed':9,'viteBuildPassed':True,'sourceUnchangedAfterChecks':True}
- else:
-  for name,cmd in [('core',[npm,'run','test:core']),('browser-preview',[npm,'run','test:browser-preview']),('vite-build',['node','node_modules/vite/bin/vite.js','build','--outDir',str(WORK/'frontend/dist')])]:
-   result['checks'][name]=run(name,cmd,900,source)
+ else:result['priorExactSourceChecks']={'run':41952945441,'sourceTree':TREE,'coreExitCode':0,'browserPreviewExitCode':0,'viteBuildExitCode':0,'guiPassed':False}
  assert run('electron-install',['node','node_modules/electron/install.js'],600,source)==0
  for identity in ('synthetic','sample-a','sample-b'):
   native=WORK/('native-'+identity);native.mkdir()
   args=['node',str(HERE/'cloud-jpeg.mjs'),str(source),str(native)]
   if identity!='synthetic':args.append(str(WORK/(identity+'.jpg')))
-  result['checks']['jpeg-'+identity]=run('jpeg-'+identity,args,900,source)
+  result['checks']['jpeg-'+identity]=run('jpeg-'+identity,args,420,source)
   import shutil
   shutil.copytree(native/'evidence',EVIDENCE/('native-'+identity))
  result['syntheticOnly']=False;result['originalPhotosTransferred']=True
@@ -80,6 +78,10 @@ try:
 except Exception as e:
  result['status']='FAIL_CONTROLLER';result['error']=str(e);EVIDENCE.mkdir(parents=True,exist_ok=True);(EVIDENCE/'controller-error.log').write_text(traceback.format_exc())
 finally:
+ # Preserve the last GUI stage, screenshots and logs even when its driver times out.
+ import shutil
+ for native in WORK.glob('native-*'):
+  if (native/'evidence').is_dir():shutil.copytree(native/'evidence',EVIDENCE/native.name,dirs_exist_ok=True)
  save(EVIDENCE/'SUMMARY.json',result)
  # Only ciphertext evidence is exposed to GitHub artifacts.
  encrypted=WORK/'encrypted';encrypted.mkdir(exist_ok=True);archive=WORK/'evidence.zip'

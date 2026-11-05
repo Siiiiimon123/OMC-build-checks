@@ -11,6 +11,8 @@ let app,vite,ws,seq=0,originalPath;const pending=new Map();
 const hash=b=>createHash('sha256').update(b).digest('hex');
 function assert(v,m){if(!v)throw Error(m);}
 const out=path.join(work,'evidence');fs.mkdirSync(out,{recursive:true});
+let currentStage=report.stage;
+Object.defineProperty(report,'stage',{enumerable:true,get:()=>currentStage,set:value=>{currentStage=value;fs.writeFileSync(path.join(out,'PROGRESS.json'),JSON.stringify({stage:value,at:new Date().toISOString()}));console.log(JSON.stringify({stage:value}));}});
 const log=fs.openSync(path.join(out,'source-app.log'),'a');
 const env={...process.env};delete env.OMC_PREVIEW15_TRANSPORT_KEY;delete env.GH_TOKEN;delete env.GITHUB_TOKEN;delete env.ELECTRON_RUN_AS_NODE;
 const call=(method,params={})=>new Promise((resolve,reject)=>{const id=++seq,t=setTimeout(()=>{pending.delete(id);reject(Error('CDP_TIMEOUT:'+method));},45000);pending.set(id,{resolve,reject,t});ws.send(JSON.stringify({id,method,params}));});
@@ -34,7 +36,7 @@ try{
  const executable=process.platform==='darwin'?'node_modules/electron/dist/Electron.app/Contents/MacOS/Electron':'node_modules/electron/dist/electron.exe';
  app=spawn(path.join(source,executable),[source,'--user-data-dir='+profile,'--remote-debugging-port=0','--no-first-run'],{cwd:source,env,stdio:['ignore',log,log],detached:process.platform==='darwin'});
  let target;for(let i=0;i<200;i++){try{const port=Number(fs.readFileSync(path.join(profile,'DevToolsActivePort'),'utf8').split('\n')[0]);const rows=await(await fetch('http://127.0.0.1:'+port+'/json/list')).json();target=rows.find(x=>x.type==='page'&&x.url.startsWith('http://localhost:5173'));if(target)break;}catch{}await delay(250);}assert(target,'NORMAL_SOURCE_MAIN_NOT_FOUND');
- ws=new WebSocket(target.webSocketDebuggerUrl);await new Promise((r,j)=>{ws.addEventListener('open',r,{once:true});ws.addEventListener('error',j,{once:true});});ws.addEventListener('message',e=>{const m=JSON.parse(e.data),p=pending.get(m.id);if(p){pending.delete(m.id);clearTimeout(p.t);m.error?p.reject(Error(JSON.stringify(m.error))):p.resolve(m.result);}});
+ ws=new WebSocket(target.webSocketDebuggerUrl);await new Promise((r,j)=>{const t=setTimeout(()=>j(Error('CDP_CONNECT_TIMEOUT')),10000);ws.addEventListener('open',()=>{clearTimeout(t);r();},{once:true});ws.addEventListener('error',e=>{clearTimeout(t);j(e);},{once:true});});ws.addEventListener('message',e=>{const m=JSON.parse(e.data),p=pending.get(m.id);if(p){pending.delete(m.id);clearTimeout(p.t);m.error?p.reject(Error(JSON.stringify(m.error))):p.resolve(m.result);}});
  await call('Runtime.enable');await call('Page.enable');await call('Emulation.setDeviceMetricsOverride',{width:1600,height:1000,deviceScaleFactor:1,mobile:false});
  await until('document.querySelector("#root")?.innerText.length>40');
  report.stage='import';await until('[...document.querySelectorAll("button")].some(e=>e.offsetWidth&&e.innerText.trim()==="使用此编号开始选片")',45000);await click('使用此编号开始选片');
@@ -68,5 +70,24 @@ try{
  assert(hash(fs.readFileSync(fixture))===report.original.sha256,'ORIGINAL_MODIFIED');
  report.status='PASS_SOURCE_JPEG';report.stage='done';report.limitations=['Source dev entry, not installed package',providedFixture?'Authorized real photo':'Synthetic photo','No AI runtime acceptance','CDP real controls and file input, not manual OS picker','Export and group workflow still require separate acceptance'];
 }catch(e){report.status='FAIL';report.error=String(e.stack||e);try{report.dom=await ev('document.body.innerText.slice(0,14000)');await snap('failure');}catch{}}
-finally{if(originalPath&&fs.existsSync(originalPath)){report.originalAfterSha256=hash(fs.readFileSync(originalPath));report.originalUnchanged=report.originalAfterSha256===report.original?.sha256;}try{ws?.close();}catch{}for(const p of [app,vite])if(p?.pid){if(process.platform==='darwin'){try{process.kill(-p.pid,'SIGTERM');}catch(e){if(e.code!=='ESRCH')throw e;}}else{await new Promise(resolve=>{const k=spawn('taskkill',['/PID',String(p.pid),'/T','/F'],{stdio:'ignore'});k.on('exit',resolve);});}}fs.writeFileSync(path.join(out,'JPEG_FUNCTIONAL.json'),JSON.stringify(report,null,2));fs.closeSync(log);}
+finally{
+ if(originalPath&&fs.existsSync(originalPath)){report.originalAfterSha256=hash(fs.readFileSync(originalPath));report.originalUnchanged=report.originalAfterSha256===report.original?.sha256;}
+ fs.writeFileSync(path.join(out,'JPEG_BEFORE_CLEANUP.json'),JSON.stringify(report,null,2));
+ report.cleanup=[];
+ if(process.platform==='darwin'&&ws?.readyState===WebSocket.OPEN){try{await Promise.race([call('Browser.close').catch(()=>null),delay(5000)]);}catch{}}
+ for(const p of [app,vite])if(p?.pid){
+  if(process.platform==='darwin'){
+   const entry={pid:p.pid,role:p===app?'app':'vite',forced:false};
+   for(const signal of ['SIGTERM','SIGKILL']){
+    if(p.exitCode!==null||p.signalCode!==null)break;
+    try{process.kill(-p.pid,signal);if(signal==='SIGKILL')entry.forced=true;}catch(e){if(e.code!=='ESRCH')entry.error=e.code;}
+    const end=Date.now()+3000;while(p.exitCode===null&&p.signalCode===null&&Date.now()<end)await delay(50);
+   }
+   entry.exitCode=p.exitCode;entry.signal=p.signalCode;entry.settled=p.exitCode!==null||p.signalCode!==null;report.cleanup.push(entry);p.unref();
+   if(!entry.settled){report.status='FAIL_CLEANUP';process.exitCode=1;}
+  }else{await new Promise(resolve=>{const k=spawn('taskkill',['/PID',String(p.pid),'/T','/F'],{stdio:'ignore'});k.on('exit',resolve);});}
+ }
+ for(const p of pending.values()){clearTimeout(p.t);p.reject(Error('TEST_FINISHED'));}pending.clear();try{ws?.close();}catch{}
+ fs.writeFileSync(path.join(out,'JPEG_FUNCTIONAL.json'),JSON.stringify(report,null,2));fs.closeSync(log);
+}
 if(report.status==='FAIL')process.exitCode=1;
