@@ -17,7 +17,7 @@ jobs:
         with: {node-version: '24.19.0', check-latest: false, package-manager-cache: false}
       - name: Split existing authenticated ciphertext without decryption or rebuild
         env: {GH_TOKEN: '${{ github.token }}'}
-        run: node relay19/relay-mac-package19.mjs
+        run: node relay19/relay-mac-package19-v2.mjs
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: mac19-existing-cipher-index

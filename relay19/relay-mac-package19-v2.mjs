@@ -1,0 +1,23 @@
+// Transport only: authenticate an existing artifact ZIP, then split its raw cipher.
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import assert from 'node:assert/strict';
+import {Readable,Transform} from 'node:stream';
+import {pipeline} from 'node:stream/promises';
+import {spawnSync} from 'node:child_process';
+assert(process.env.GITHUB_ACTIONS==='true'&&process.env.GITHUB_REPOSITORY==='Siiiiimon123/OMC-build-checks');
+assert(process.env.GITHUB_REF==='refs/heads/verify-final-package19'&&process.env.GITHUB_RUN_ATTEMPT==='1');
+const artifact=13398140152,bytes=983623986,sha='6346ff1a22dbdb2d4f08eda00bce38815eea6a3458a29e85f36d4b8986e203de';
+const root=path.join(process.env.RUNNER_TEMP,'omc-mac19-cipher-transfer');assert(!fs.existsSync(root));fs.mkdirSync(root);
+const token=process.env.GH_TOKEN;assert(token);delete process.env.GH_TOKEN;
+const endpoint='https://api.github.com/repos/Siiiiimon123/OMC-build-checks/actions/artifacts/'+artifact;
+const headers={Authorization:'Bearer '+token,Accept:'application/vnd.github+json'};
+const metaResponse=await fetch(endpoint,{headers,signal:AbortSignal.timeout(30000)});assert(metaResponse.ok,'ARTIFACT_META_ACCESS');
+const meta=await metaResponse.json();assert(meta.id===artifact&&meta.size_in_bytes===bytes&&meta.digest==='sha256:'+sha&&!meta.expired,'EXACT_ARTIFACT_IDENTITY');
+const response=await fetch(endpoint+'/zip',{headers,signal:AbortSignal.timeout(8*60*1000)});assert(response.ok&&response.body,'CIPHER_DOWNLOAD');
+const archive=path.join(root,'original.zip');let count=0;const h=crypto.createHash('sha256');
+await pipeline(Readable.fromWeb(response.body),new Transform({transform(chunk,enc,cb){count+=chunk.length;if(count>bytes)return cb(Error('ARTIFACT_TOO_LONG'));h.update(chunk);cb(null,chunk);}}),fs.createWriteStream(archive,{flags:'wx',mode:0o600}));
+assert(count===bytes&&h.digest('hex')===sha,'WHOLE_CIPHERTEXT_ZIP_MISMATCH');
+const split=spawnSync('python3',[path.join(import.meta.dirname,'split-existing-mac-cipher.py'),root],{stdio:'inherit',timeout:120000});
+assert(split.status===0,'RAW_CIPHER_SPLIT_FAILED');
