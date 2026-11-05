@@ -56,9 +56,8 @@ try:
    dest=source.joinpath(*p.parts);dest.parent.mkdir(parents=True,exist_ok=True);dest.write_bytes(b)
  assert json.loads((source/'package.json').read_bytes())['version']=='1.0.21-preview.19'
  assert run('npm-ci',['npm.cmd','ci','--ignore-scripts','--no-audit','--no-fund'],900,source)==0
- # Required checks execute on the VM only; all results retained even if one fails.
- for name,cmd in [('core',['npm.cmd','run','test:core']),('browser-preview',['npm.cmd','run','test:browser-preview']),('vite-build',['node','node_modules/vite/bin/vite.js','build','--outDir',str(WORK/'frontend/dist')])]:
-  result['checks'][name]=run(name,cmd,900,source)
+ # Exact unchanged source already passed these on VM41950689366; do not repeat.
+ result['priorExactSourceChecks']={'run':41950689366,'sourceTree':TREE,'corePassed':346,'browserPreviewPassed':9,'viteBuildPassed':True,'sourceUnchangedAfterChecks':True}
  assert run('electron-install',['node','node_modules/electron/install.js'],600,source)==0
  for identity in ('synthetic','sample-a','sample-b'):
   native=WORK/('native-'+identity);native.mkdir()

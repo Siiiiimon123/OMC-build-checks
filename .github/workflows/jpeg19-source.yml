@@ -17,6 +17,10 @@ jobs:
         with: {node-version: '24.19.0', architecture: x64, check-latest: false, package-manager-cache: false}
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
         with: {python-version: '3.12.10', architecture: x64, check-latest: false}
+      - name: Validate cloud harness before product execution
+        run: |
+          node --check jpeg19-source/cloud-jpeg.mjs
+          node jpeg19-source/cloud-preflight.mjs
       - name: Source, synthetic and authorized real JPEG acceptance on VM
         env:
           OMC_PREVIEW15_TRANSPORT_KEY: '${{ secrets.OMC_PREVIEW15_TRANSPORT_KEY }}'

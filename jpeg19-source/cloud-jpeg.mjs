@@ -14,8 +14,8 @@ const out=path.join(work,'evidence');fs.mkdirSync(out,{recursive:true});
 const log=fs.openSync(path.join(out,'source-app.log'),'a');
 const env={...process.env};delete env.OMC_PREVIEW15_TRANSPORT_KEY;delete env.GH_TOKEN;delete env.GITHUB_TOKEN;delete env.ELECTRON_RUN_AS_NODE;
 const call=(method,params={})=>new Promise((resolve,reject)=>{const id=++seq,t=setTimeout(()=>{pending.delete(id);reject(Error('CDP_TIMEOUT:'+method));},45000);pending.set(id,{resolve,reject,t});ws.send(JSON.stringify({id,method,params}));});
-async function ev(expression){const r=await call('Runtime.evaluate',{expression:'JSON.stringify(await (async()=>('+expression+'))())',returnByValue:true,awaitPromise:true});if(r.exceptionDetails)throw Error('RENDERER_EVAL:'+JSON.stringify(r.exceptionDetails).slice(0,1200));return JSON.parse(r.result.value);}
-async function until(expression,ms=120000){const end=Date.now()+ms;while(Date.now()<end){if(await ev(expression))return;await delay(200);}throw Error('WAIT:'+expression.slice(0,130));}
+async function ev(expression){const r=await call('Runtime.evaluate',{expression:'(async()=>{const value=await ('+expression+');return JSON.stringify(value);})()',returnByValue:true,awaitPromise:true});if(r.exceptionDetails)throw Error('RENDERER_EVAL:'+JSON.stringify(r.exceptionDetails).slice(0,1200));return JSON.parse(r.result.value);}
+async function until(expression,ms=120000){const end=Date.now()+ms;while(Date.now()<end){if(await ev('Boolean(await ('+expression+'))'))return;await delay(200);}throw Error('WAIT:'+expression.slice(0,130));}
 async function click(text){assert(await ev(`(()=>{const e=[...document.querySelectorAll('button')].find(e=>e.offsetWidth&&!e.disabled&&(e.getAttribute('aria-label')===${JSON.stringify(text)}||e.innerText.trim()===${JSON.stringify(text)}));if(!e)return false;e.click();return true})()`),'BUTTON:'+text);}
 async function snap(name){const r=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});fs.writeFileSync(path.join(out,name+'.png'),Buffer.from(r.data,'base64'));}
 try{

@@ -1,24 +1,23 @@
 {
-  "schema": "omc-cloud-execution-scope-v2",
-  "authorization": "User requested cloud/GitHub validation, and explicitly approved two JPEG originals in call_0c6b1e5e82374bfa81e789eef93720bc",
-  "sourceTree": "1e39b9ae2921480b27d4a1a8bf5f8499004886fa",
-  "costLimitUSD": 0,
-  "runTimeoutMinutes": 60,
-  "automaticRerun": false,
-  "publicContent": "generic harness plus authenticated encrypted source/records and exactly two approved JPEG originals; no plaintext product source or photos",
-  "secrets": "Reuse existing data transport secret only; removed from product/test child environment",
-  "priorFailures": [
-    {
-      "run": 41883754081,
-      "stage": "source TLS handshake reset; checks empty"
-    },
-    {
-      "run": 41883937874,
-      "stage": "source TLS handshake reset; checks empty"
-    }
+  "schema": "omc-cloud-execution-scope-v3",
+  "authorization": "Two-photo cloud acceptance approved in call_0c6b1e5e82374bfa81e789eef93720bc; card allows one initial Windows run and up to two manual repair runs",
+  "photoAuthorizedRound": {
+    "completedRuns": [
+      41950689366
+    ],
+    "next": "First manual repair run; same source and exact same two photos",
+    "maxWindowsRuns": 3,
+    "maxMinutesEach": 60,
+    "costLimitUSD": 0,
+    "automaticRerun": false
+  },
+  "preConsentSourceNetworkFailures": [
+    41883754081,
+    41883937874
   ],
-  "nextRun": "One corrected cloud run using Git-hosted ciphertext, with proper existing transport AAD and actual embedded viewer selectors",
+  "sourceTree": "1e39b9ae2921480b27d4a1a8bf5f8499004886fa",
+  "fix": "Actual CDP helper async expression and Boolean wait; cloud preflight tests the actual helper first",
+  "scope": "Existing authenticated ciphertext only; no new models, photos, secrets or main changes",
   "productionChange": false,
-  "mainChange": false,
   "installerAcceptance": false
 }
