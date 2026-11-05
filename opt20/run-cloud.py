@@ -87,7 +87,7 @@ try:
         ok=ready and stage('technical-feature-regression',[sys.executable,'-m','unittest','discover',
             '-s','ai-training/tests','-p','test_technical_probability_precision.py'],source,timeout=120)
         raise SystemExit(0 if ok else 1)
-    if os.environ.get('OMC_R20_ENGINE_BASELINE')=='1':
+    if os.environ.get('OMC_R20_ENGINE_BASELINE')=='1' or os.environ.get('OMC_R20_SOURCE_GUARDS_ONLY')=='1':
         expected=json.loads((HERE/'engine-baseline-input.json').read_bytes())
         rows=[[p.relative_to(source).as_posix(),hashlib.sha256(p.read_bytes()).hexdigest()]
               for p in sorted(source.rglob('*')) if p.is_file()]
@@ -100,6 +100,14 @@ try:
     npm='npm.cmd' if os.name=='nt' else 'npm'
     if not stage('dependencies',[npm,'ci','--ignore-scripts','--no-audit','--no-fund'],source,timeout=420):
         raise RuntimeError('DEPENDENCY_PREPARATION_FAILED')
+    if os.environ.get('OMC_R20_SOURCE_GUARDS_ONLY')=='1':
+        checks=[stage('core',[npm,'run','test:core'],source),
+            stage('browser-preview',[npm,'run','test:browser-preview'],source)]
+        previous=source/'preview-manifest.json'
+        if previous.exists():previous.rename(REPORTS/'previous-preview-manifest.json')
+        checks.append(stage('build-browser-preview',[npm,'run','build:browser-preview'],source))
+        ok=all(checks)
+        raise SystemExit(0 if ok else 1)
     if os.environ.get('OMC_R20_ENGINE_BASELINE')=='1':
         if os.environ.get('OMC_R20_CHANGED_BATCHER')=='1':
             # These exact unchanged batching functions/tests passed 61 cases
