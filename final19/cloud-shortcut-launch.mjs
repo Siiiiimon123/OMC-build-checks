@@ -57,6 +57,9 @@ try{
  // closes the property gate even when a path wrapper cannot read Unicode.
  report.nativeTargetAndIconVerifiedOnIdenticalBytes=true;
  await request('Runtime.evaluate',{expression:'(()=>{setTimeout(()=>process.mainModule.require("electron").app.quit(),50);return true})()',returnByValue:true});
+ // Node waits for an attached inspector to disconnect on shutdown. Reuse the
+ // successful flow's lifetime rule: close QA channels before checking exit.
+ pageSocket.close();socket.close();
  const deadline=Date.now()+30000;while(alive()&&Date.now()<deadline)await delay(100);assert(!alive(),'SHORTCUT_NORMAL_EXIT_TIMEOUT');normalClosed=true;
  assert(sha(original)===before&&sha(copy)===before,'SHORTCUT_BYTES_CHANGED');report.status='PASS_ACTUAL_UNICODE_DESKTOP_SHORTCUT_LAUNCH_AND_NATIVE_LINK_READ';report.originalShortcutUnchanged=true;report.normalExitVerified=true;
 }catch(e){report.status='FAIL';report.error=String(e.stack||e);}

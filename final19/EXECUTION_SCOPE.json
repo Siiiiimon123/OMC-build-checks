@@ -14,7 +14,7 @@
   "automaticRerun": false,
   "stopRepeatingSuccessfulStage": true,
   "executed": {
-    "windows": 13,
+    "windows": 14,
     "mac": 2
   },
   "sameApprovedTwoPhotosOnly": true,
@@ -27,11 +27,11 @@
     "platforms": [
       "windows"
     ],
-    "windowsAttempt": 14,
+    "windowsAttempt": 15,
     "mode": "ACTUAL_UNICODE_SHORTCUT_LAUNCH_WITH_UNCHANGED_PAYLOAD_PROOF_REUSE",
     "artifact": 13402959173,
     "sha256": "daade4392f5b77262fbd1f53b4ffbcb89e73290952f1a0779739c0ff8d97eb27",
-    "reason": "Run42013890903 actually launched original Unicode link and connected main inspector, then QA queried module APIs before ready without retaining exception. Capture process identity immediately, wait real UI, collect precise native read; same-byte ASCII copy plus actual original launch independently binds target/icon. No product or shortcut edit, no AI/JPEG repeat.",
+    "reason": "Run42014912441 proves original Unicode link really launches exact installed EXE/UI and native target/icon/AppID plus identical copy all correct. QA left Node inspector attached during quit, causing shutdown wait. Close both QA sockets before checking process exit; product and link unchanged.",
     "approval": "User same-scope free continuation, no repeated questions",
     "macRebuilt": false
   },
