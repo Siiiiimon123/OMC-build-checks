@@ -3,7 +3,7 @@ name: Final19 native packaging and installed acceptance
   push:
     branches: ['verify-final-package19']
     paths: ['.github/workflows/final-package19.yml', 'final19/**']
-permissions: {contents: read}
+permissions: {contents: read, actions: read}
 jobs:
   native:
     if: github.repository == 'Siiiiimon123/OMC-build-checks' && github.event.repository.private == false && github.run_attempt == 1
@@ -24,11 +24,13 @@ jobs:
         with: {python-version: '${{ matrix.python }}', architecture: '${{ matrix.arch }}', check-latest: false}
       - name: Validate controller syntax before dependency downloads
         run: python final19/run-final-package-cloud.py --preflight
-      - name: Build exact native installer and verify installed App
+      - name: Install existing frozen Windows19 and verify complete App
         env:
           OMC_PREVIEW15_TRANSPORT_KEY: '${{ secrets.OMC_PREVIEW15_TRANSPORT_KEY }}'
           PYTHONDONTWRITEBYTECODE: '1'
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          OMC_ACCEPT_EXISTING_WINDOWS: '1'
+          GH_TOKEN: '${{ github.token }}'
         run: python final19/run-final-package-cloud.py
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         if: always()

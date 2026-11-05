@@ -151,9 +151,42 @@ def main():
                 literal = str(file).replace("'", "''")
                 ps += "$t=$null;$e=$null;[void][System.Management.Automation.Language.Parser]::ParseFile('" + literal + "',[ref]$t,[ref]$e);if($e.Count){throw ($e|Out-String)};"
             run('parse-native-install-helpers', ['powershell.exe', '-NoProfile', '-Command', ps], timeout=60)
-        # The 1.06GB existing model transport is downloaded/decrypted only here.
-        fetch_exact('fetch-existing-model-transport', HERE / 'RESOURCE_TRANSPORT.json', 'base', WORK / 'base.tar')
-        if sys.platform == 'win32':
+        acceptance_only = os.environ.get('OMC_ACCEPT_EXISTING_WINDOWS') == '1'
+        if acceptance_only:
+            assert sys.platform == 'win32'
+            run('retrieve-frozen-windows-artifact', ['node', HERE / 'fetch-frozen-windows19.mjs',
+                WORK / 'frozen-package.zip'], timeout=600, private=True)
+            cipher = WORK / 'frozen-cipher'
+            cipher.mkdir()
+            with zipfile.ZipFile(WORK / 'frozen-package.zip') as z:
+                assert set(z.namelist()) == {'package.enc', 'PACKAGE_READY.json'}
+                for row in z.infolist():
+                    assert not row.is_dir() and row.file_size <= 804 * 1024**2
+                    with z.open(row) as reader, (cipher / row.filename).open('xb') as writer:
+                        shutil.copyfileobj(reader, writer, 1024**2)
+            package_inputs = inputs / 'PACKAGE_INPUTS.json'
+            current_record = json.loads(package_inputs.read_bytes())
+            current = current_record['current']
+            assert current_record['baselineSourceTree'] == SOURCE_TREE
+            assert current['bytes'] == 803348413
+            assert current['sha256'] == 'daade4392f5b77262fbd1f53b4ffbcb89e73290952f1a0779739c0ff8d97eb27'
+            package = WORK / Path(current['path']).name
+            run('decrypt-exact-frozen-windows', ['node', transport, 'decrypt', '--manifest',
+                cipher / 'PACKAGE_READY.json', '--id', 'pkg', '--input', cipher / 'package.enc',
+                '--output', package], timeout=600, private=True)
+            assert package.stat().st_size == current['bytes'] and sha(package) == current['sha256']
+            current['path'] = str(package)
+            save(package_inputs, current_record)
+            result['acceptanceOnlyFrozenArtifact'] = 13402959173
+            result['productRebuilt'] = False
+            run('npm-ci-fixed-source', ['npm.cmd', 'ci', '--ignore-scripts', '--no-audit', '--no-fund'], source)
+            run('first-install-windows', ['powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass',
+                '-File', inputs / 'Install-FinalWindows.ps1', '-InputsPath', package_inputs,
+                '-OutputPath', evidence / 'FIRST_INSTALL.json'], timeout=600)
+            installed = json.loads((evidence / 'FIRST_INSTALL.json').read_text(encoding='utf-8-sig'))['executable']
+        elif sys.platform == 'win32':
+            # A new build alone requires model transport; acceptance reuses the frozen installer.
+            fetch_exact('fetch-existing-model-transport', HERE / 'RESOURCE_TRANSPORT.json', 'base', WORK / 'base.tar')
             assert platform.python_version() == '3.14.5'
             fetch_exact('fetch-existing-windows18', HERE / 'WIN18_BASE_OUTPUTS.json', 'pkg', WORK / 'win18.exe')
             run('npm-ci-fixed-source', ['npm.cmd', 'ci', '--ignore-scripts', '--no-audit', '--no-fund'], source)
@@ -174,6 +207,7 @@ def main():
                 '-OutputPath', evidence / 'FIRST_INSTALL.json'], timeout=600)
             installed = json.loads((evidence / 'FIRST_INSTALL.json').read_bytes())['executable']
         else:
+            fetch_exact('fetch-existing-model-transport', HERE / 'RESOURCE_TRANSPORT.json', 'base', WORK / 'base.tar')
             assert platform.python_version() == '3.12.10'
             run('build-install-final-mac', [sys.executable, HERE / 'cloud-final-mac-build.py',
                 '--source', source, '--records', WORK / 'source19-records.plain', '--resource-tar', WORK / 'base.tar',
@@ -215,7 +249,7 @@ def main():
         run('encrypt-reports', ['node', transport, 'encrypt', '--input', archive,
             '--output', encrypted / 'reports.enc', '--id', 'reports', '--manifest', encrypted / 'REPORTS_READY.json'],
             timeout=600, private=True)
-        if package and package.is_file():
+        if package and package.is_file() and os.environ.get('OMC_ACCEPT_EXISTING_WINDOWS') != '1':
             run('encrypt-package', ['node', transport, 'encrypt', '--input', package,
                 '--output', encrypted / 'package.enc', '--id', 'pkg', '--manifest', encrypted / 'PACKAGE_READY.json'],
                 timeout=600, private=True)
