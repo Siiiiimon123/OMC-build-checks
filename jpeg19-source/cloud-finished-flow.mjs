@@ -1,5 +1,5 @@
 // Existing-project control patterns: jpeg-dom-final.mjs crop/group/export checks.
-// The only test adapter is the native folder picker; no DB/project/recipe injection.
+// Native picker answers are adapted; real import/export IPC and DB paths stay intact.
 import fs from 'node:fs';
 import path from 'node:path';
 import {createRequire} from 'node:module';
@@ -7,6 +7,21 @@ import {createHash} from 'node:crypto';
 const delay=ms=>new Promise(r=>setTimeout(r,ms));
 const hash=b=>createHash('sha256').update(b).digest('hex');
 function check(v,m){if(!v)throw Error(m);}
+export function installImportPicker(files){
+ const {dialog}=process.mainModule.require('electron');
+ if(!Array.isArray(files)||files.length<1||files.length>2||files.some(p=>typeof p!=='string'||!p))throw Error('IMPORT_FIXTURE_PATHS');
+ dialog.showOpenDialog=async(...args)=>{const options=args.at(-1);if(options?.title!=='选择照片文件'||!options.properties?.includes('openFile')||!options.properties?.includes('multiSelections')||options.properties.includes('openDirectory'))throw Error('UNREVIEWED_IMPORT_PICKER');return{canceled:false,filePaths:[...files]};};
+ return true;
+}
+export async function installCloudImportPicker(work,files){
+ const log=fs.readFileSync(path.join(work,'evidence/source-app.log'),'utf8');
+ const endpoint=[...log.matchAll(/Debugger listening on (ws:\/\/127\.0\.0\.1:\d+\/[^\s]+)/g)].at(-1)?.[1];check(endpoint,'IMPORT_MAIN_INSPECTOR_ENDPOINT');
+ const socket=new WebSocket(endpoint);let timer;
+ try{
+  await new Promise((resolve,reject)=>{timer=setTimeout(()=>reject(Error('IMPORT_MAIN_CONNECT_TIMEOUT')),10000);socket.addEventListener('open',()=>{clearTimeout(timer);resolve();},{once:true});socket.addEventListener('error',()=>{clearTimeout(timer);reject(Error('IMPORT_MAIN_CONNECT'));},{once:true});});
+  return await new Promise((resolve,reject)=>{timer=setTimeout(()=>reject(Error('IMPORT_MAIN_EVALUATION_TIMEOUT')),10000);socket.addEventListener('message',event=>{const reply=JSON.parse(event.data);if(reply.id!==1)return;clearTimeout(timer);if(reply.error||reply.result?.exceptionDetails)reject(Error('IMPORT_MAIN_EVALUATION'));else resolve(reply.result?.result?.value);});socket.send(JSON.stringify({id:1,method:'Runtime.evaluate',params:{expression:'('+installImportPicker.toString()+')('+JSON.stringify(files)+')',returnByValue:true,awaitPromise:true}}));});
+ }finally{clearTimeout(timer);socket.close();}
+}
 export function installExportPicker(output){
  const {dialog}=process.mainModule.require('electron');
  dialog.showOpenDialog=async(...args)=>{const options=args.at(-1);if(options?.title!=='选择导出位置'||!options.properties?.includes('openDirectory'))throw Error('UNREVIEWED_PICKER');return{canceled:false,filePaths:[output]};};

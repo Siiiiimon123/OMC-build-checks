@@ -1,6 +1,6 @@
 // Generic cloud driver. Product source and authorized samples are decrypted only inside the VM.
 import fs from 'node:fs';
-import {runFinishedFlow} from './cloud-finished-flow.mjs';
+import {runFinishedFlow,installCloudImportPicker} from './cloud-finished-flow.mjs';
 import path from 'node:path';
 import {spawn} from 'node:child_process';
 import {createHash} from 'node:crypto';
@@ -51,7 +51,8 @@ try{
  report.stage='import';await until('[...document.querySelectorAll("button")].some(e=>e.offsetWidth&&e.innerText.trim()==="使用此编号开始选片")',45000);await click('使用此编号开始选片');
  if(await ev('Boolean(document.querySelector("button[aria-label=跳过新手引导]"))'))await click('跳过新手引导');
  await until('[...document.querySelectorAll("button")].some(e=>e.offsetWidth&&e.getAttribute("aria-label")==="导入照片")');await click('导入照片');
- await call('DOM.enable');const doc=await call('DOM.getDocument');const input=await call('DOM.querySelector',{nodeId:doc.root.nodeId,selector:'input[type=file]'});assert(input.nodeId,'REAL_FILE_INPUT');await call('DOM.setFileInputFiles',{nodeId:input.nodeId,files:fixtureRows.map(f=>f.path)});await until('document.querySelectorAll(".photo-tile").length==='+fixtureRows.length);
+ assert(await installCloudImportPicker(work,fixtureRows.map(f=>f.path)),'NATIVE_IMPORT_PICKER_ADAPTER');await click('选择文件');await until('document.querySelectorAll(".photo-tile").length==='+fixtureRows.length);
+ report.importPath={nativeDesktopPickerAdapter:true,browserFileInputUsed:false,sourceGrantsCreatedByRealIpc:true};
  if(await ev('Boolean(document.querySelector("button[aria-label=跳过新手引导]"))'))await click('跳过新手引导');
  await ev('(()=>{document.querySelector(".photo-tile").click();return true})()');await click('单图');await until('Boolean(document.querySelector(".single-photo-view"))');await snap('imported');
  report.stage='open_adjustment';await until('[...document.querySelectorAll("button")].some(e=>e.offsetWidth&&!e.disabled&&e.innerText.includes("JPEG 基础调整"))');
