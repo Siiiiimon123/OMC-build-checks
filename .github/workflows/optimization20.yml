@@ -30,6 +30,7 @@ jobs:
           OMC_R20_NATIVE_UI: '1'
           OMC_R20_TIMING_ONLY: '1'
           OMC_R20_FAST_DISPLAY: '1'
+          OMC_R20_FINISHED_FLOW: '1'
           GH_TOKEN: '${{ github.token }}'
         run: python opt20/run-cloud.py
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9

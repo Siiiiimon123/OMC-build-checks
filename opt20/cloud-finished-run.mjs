@@ -61,6 +61,35 @@ try{
  await until('document.querySelector(".single-photo-view .highres-viewer[data-adjustment-preview=effect] img")?.complete');
  const pixelsExpression='(()=>{const i=document.querySelector(".single-photo-view .highres-viewer[data-adjustment-preview=effect] img"),c=document.createElement("canvas");if(!i||!i.complete||!i.naturalWidth)throw Error("DISPLAY_IMAGE_NOT_READY");c.width=64;c.height=64;const x=c.getContext("2d");x.drawImage(i,0,0,64,64);const d=x.getImageData(0,0,64,64).data;let sum=0,h=2166136261;for(let k=0;k<d.length;k++)if(k%4!==3){sum+=d[k];h=Math.imul(h^d[k],16777619)}return {mean:sum/(64*64*3),fingerprint:(h>>>0).toString(16),width:i.naturalWidth,height:i.naturalHeight}})()';
  report.initial=await ev('(()=>{const s=document.querySelector(".exposure-dialog");return {quality:s.dataset.previewQuality,images:[...document.querySelectorAll(".single-photo-view .highres-viewer[data-adjustment-preview=effect] img")].map(i=>({width:i.naturalWidth,height:i.naturalHeight,complete:i.complete})),alerts:[...s.querySelectorAll("[role=alert]")].map(e=>e.innerText)}})()');report.initial.pixels=await ev(pixelsExpression);assert(!report.initial.alerts.length,'INITIAL_PREVIEW_ERROR');assert(report.initial.images.some(i=>i.width>0),'INITIAL_PREVIEW_EMPTY');await snap('initial-refined');
+ if(process.env.OMC_R20_FINISHED_FLOW==='1'){
+  report.stage='late_coupled_result_switch';
+  await ev(`(async()=>{
+   const {photoSelectionService:service}=await import('/src/services/photoSelectionService.js');
+   const original=service.previewJpegExposure;
+   window.__r20Held={ready:false};window.__r20Restore=()=>{service.previewJpegExposure=original;};
+   service.previewJpegExposure=async(...args)=>{
+    const result=await original(...args);
+    if(!window.__r20Held.ready&&args[3]?.previewQuality==='interactive'&&args[2]?.saturationFactor!==1){
+     window.__r20Held.ready=true;window.__r20Held.width=result.originalPreviewPixelSize?.width;
+     await new Promise(resolve=>{window.__r20Release=resolve;});
+    }return result;
+   };return true;
+  })()`);
+  await ev(`(()=>{document.querySelector('input[type="range"][aria-label="饱和度百分比"]').focus();return true})()`);
+  for(const type of ['keyDown','keyUp'])await call('Input.dispatchKeyEvent',{type,key:'ArrowRight',code:'ArrowRight',windowsVirtualKeyCode:39});
+  await until('window.__r20Held.ready',120000);
+  const held=await ev('window.__r20Held');
+  for(const type of ['keyDown','keyUp'])await call('Input.dispatchKeyEvent',{type,key:'ArrowLeft',code:'ArrowLeft',windowsVirtualKeyCode:37});
+  await until('document.querySelector(".exposure-dialog")?.dataset.previewBackend==="display-channel-filter"');
+  const sourceWidth=await ev('document.querySelector(".single-photo-view .highres-viewer[data-adjustment-preview=effect] img").naturalWidth');
+  assert(held.width<sourceWidth,'LATE_PROXY_NOT_SMALLER_THAN_RETAINED_SOURCE');
+  await ev('(()=>{window.__r20Release();return true})()');
+  const widths=[];for(let i=0;i<8;i++){widths.push(await ev('document.querySelector(".single-photo-view .highres-viewer[data-adjustment-preview=effect] img").naturalWidth'));await delay(15);}
+  assert(widths.every(w=>w>=sourceWidth),'LATE_WORKER_DOWNGRADED_CURRENT_SOURCE');
+  await ev('(()=>{window.__r20Restore();return true})()');
+  report.lateWorkerSwitch={actualOldResultHeld:true,oldProxyWidth:held.width,currentSourceWidth:sourceWidth,observedWidths:widths};
+  await until('document.querySelector(".exposure-dialog")?.dataset.previewQuality==="refined"',120000);
+ }
  report.stage='drag';
  const bounds=await ev(`(()=>{const e=document.querySelector('input[type="range"][aria-label="曝光 EV"]');e.scrollIntoView({block:"center"});const r=e.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height,min:Number(e.min),max:Number(e.max)}})()`);
  await ev('(()=>{window.__omcCloudFrames=[];const s=document.querySelector(".exposure-dialog");window.__omcCloudObserver=new MutationObserver(()=>{if(window.__omcCloudFrames.length<2000)window.__omcCloudFrames.push({at:performance.now(),quality:s.dataset.previewQuality,backend:s.dataset.previewBackend,liveDraft:s.dataset.previewLiveDraft,feedback:s.dataset.previewFeedbackMs,timing:JSON.parse(s.dataset.previewTiming??"null"),images:[...document.querySelectorAll(".single-photo-view .highres-viewer[data-adjustment-preview=effect] img")].map(i=>i.currentSrc.slice(-100))})});window.__omcCloudObserver.observe(document.body,{subtree:true,attributes:true,attributeFilter:["src","data-preview-feedback-ms","data-preview-quality","data-preview-timing","data-preview-live-draft"]});return true})()');
@@ -90,7 +119,7 @@ try{
  await until('document.querySelector(".single-photo-view .highres-viewer[data-adjustment-preview=effect] img")?.complete');
  await ev('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve(true))))');
  report.after=await ev(`(()=>{const s=document.querySelector(".exposure-dialog");return {quality:s.dataset.previewQuality,value:document.querySelector('input[type="range"][aria-label="曝光 EV"]').value,images:[...document.querySelectorAll(".single-photo-view .highres-viewer[data-adjustment-preview=effect] img")].map(i=>({width:i.naturalWidth,height:i.naturalHeight,complete:i.complete})),alerts:[...s.querySelectorAll("[role=alert]")].map(e=>e.innerText),feedback:s.dataset.previewFeedbackMs}})()`);report.after.pixels=await ev(pixelsExpression);assert(!report.after.alerts.length,'FINAL_PREVIEW_ERROR');assert(report.after.images.length>0&&report.after.images.every(i=>i.complete&&i.width>0&&Math.max(i.width,i.height)<=1800),'DISPLAY_DIMENSION_OR_DECODE');assert(report.after.pixels.fingerprint!==report.initial.pixels.fingerprint&&report.after.pixels.mean>report.initial.pixels.mean+1,'PIXELS_DID_NOT_BRIGHTEN');await snap('adjusted-refined');
- if(process.env.OMC_R20_TIMING_ONLY!=='1'){
+ if(process.env.OMC_R20_TIMING_ONLY!=='1'||process.env.OMC_R20_FINISHED_FLOW==='1'){
  report.stage='save';await ev('(()=>{const b=[...document.querySelectorAll(".exposure-dialog button")].find(e=>e.getAttribute("aria-label")?.startsWith("保存")&&!e.disabled);if(!b)throw Error("SAVE_DISABLED");b.click();return true})()');await until('document.querySelector(".exposure-dialog")?.innerText.includes("已保存")&&[...document.querySelectorAll(".exposure-dialog button")].some(e=>e.getAttribute("aria-label")==="返回信息"&&!e.disabled)');await snap('saved');
  report.stage='reopen';await click('返回信息');await until('!document.querySelector(".exposure-dialog")');await click('调整 JPEG 参数');await until('document.querySelector(".exposure-dialog")?.dataset.previewQuality==="refined"',240000);
  report.reopenedValue=await ev(`Number(document.querySelector('input[type="range"][aria-label="曝光 EV"]').value)`);assert(report.reopenedValue===Number(report.after.value),'SAVED_VALUE_NOT_RESTORED');await snap('reopened');
@@ -106,7 +135,7 @@ try{
  report.finishedFlow=await runFinishedFlow({source,work,call,ev,until,click,snap,fixtures:fixtureRows,restartApp});
  assert(fixtureRows.every(f=>hash(fs.readFileSync(f.path))===f.sha256),'ORIGINAL_MODIFIED');
  }
- report.status=process.env.OMC_R20_TIMING_ONLY==='1'?'PASS_SOURCE_PREVIEW_PHASE_MEASUREMENT':'PASS_SOURCE_FINISHED_JPEG_FLOW';report.stage='done';report.limitations=['Source dev entry, not installed package',providedFixture?'Authorized real photo':'Synthetic photo','No AI runtime acceptance','CDP real controls and file input, not manual OS picker','Folder picker is adapted in main memory; manual OS chooser not tested','Final self-contained installer, complete AI and in-app upgrade require separate acceptance'];
+ report.status=process.env.OMC_R20_TIMING_ONLY==='1'&&process.env.OMC_R20_FINISHED_FLOW!=='1'?'PASS_SOURCE_PREVIEW_PHASE_MEASUREMENT':'PASS_SOURCE_FINISHED_JPEG_FLOW';report.stage='done';report.limitations=['Source dev entry, not installed package',providedFixture?'Authorized real photo':'Synthetic photo','No AI runtime acceptance','CDP real controls and file input, not manual OS picker','Folder picker is adapted in main memory; manual OS chooser not tested','Final self-contained installer, complete AI and in-app upgrade require separate acceptance'];
 }catch(e){report.status='FAIL';report.error=String(e.stack||e);try{report.dom=await ev('document.body.innerText.slice(0,14000)');await snap('failure');}catch{}}
 finally{
  if(originalPath&&fs.existsSync(originalPath)){report.originalAfterSha256=hash(fs.readFileSync(originalPath));report.originalUnchanged=report.originalAfterSha256===report.original?.sha256;}

@@ -142,9 +142,9 @@ try:
             if not stage('authenticate-'+asset['id'],['node',str(TRANSPORT),'decrypt','--input',str(cipher),
                 '--manifest',str(manifest),'--id',asset['id'],'--output',str(WORK/(asset['id']+'.jpg'))],private_env=True):
                 raise RuntimeError('PHOTO_AUTHENTICATION_FAILED')
-        for identity in (('sample-b',) if timing_only else ('sample-a','sample-b','synthetic')):
+        for identity in (('sample-b','synthetic') if os.environ.get('OMC_R20_FINISHED_FLOW')=='1' else ('sample-b',) if timing_only else ('sample-a','sample-b','synthetic')):
             case=REPORTS/('native-'+identity);case.mkdir()
-            child_env['OMC_R20_VIEWPORT']='compact' if identity=='sample-a' else 'wide'
+            child_env['OMC_R20_VIEWPORT']='compact' if identity=='sample-a' or os.environ.get('OMC_R20_FINISHED_FLOW')=='1' else 'wide'
             command=['node',str(HERE/'cloud-finished-run.mjs'),str(source),str(case)]
             if identity!='synthetic':
                 command.append(str(WORK/(identity+'.jpg')))
