@@ -78,7 +78,7 @@ export async function runFinishedFlow({source,work,call,ev,until,click,snap,fixt
   await until('[...document.querySelectorAll(".basic-visual-grouping-panel button")].some(e=>!e.disabled&&e.innerText.trim()==="基础视觉分组，不含AI质量")');await click('基础视觉分组，不含AI质量');
   await until('Boolean(window.__omcBasicGroupingError)||/已保存|基础运行已保存/.test(document.querySelector(".basic-visual-grouping-panel")?.innerText??"")',90000);
   result.basicGroupingError=await page(()=>window.__omcBasicGroupingError);check(!result.basicGroupingError,'ACTUAL_BASIC_GROUPING_FAILED:'+result.basicGroupingError?.code);
-  await click('相似组');await until('Boolean(document.querySelector(".group-compare"))');
+  await click('相似组');await waitPage(n=>document.querySelectorAll('.gcp-card').length===n&&Boolean(document.querySelector('.gcp-card[aria-current=true]')),fixtures.length);
   const selected=await page(()=>{const c=document.querySelector('.gcp-card[aria-current=true]');return c?{name:c.querySelector('img')?.alt,label:c.getAttribute('aria-label')}:null;});check(selected?.name,'REAL_GROUP_NOT_FORMED');
   progress('group-adjust-and-crop');
   await page(()=>{const e=[...document.querySelectorAll('.group-compare button')].find(e=>e.offsetWidth&&!e.disabled&&e.innerText.trim()==='调整 JPEG');if(!e)throw Error('GROUP_ADJUST_MISSING');e.click();return true;});
@@ -94,6 +94,7 @@ export async function runFinishedFlow({source,work,call,ev,until,click,snap,fixt
   const afterRestart=await savedPreview(true);check(beforeRestart.ev===afterRestart.ev&&beforeRestart.pixelSha256===afterRestart.pixelSha256,'RESTART_SAVED_PREVIEW_MISMATCH');await openCrop(true);const restored=await cropDimensions();check(restored.width===gcrop.width&&restored.height===gcrop.height,'RESTART_CROP_LOST');await click('取消（Esc）');result.restart.savedPreview={before:beforeRestart,after:afterRestart};result.restart.cropRestored=true;result.restart.groupOpenedExplicitly=true;await snap('group-reopened-after-app-restart');
   // Keep the group-edited photo through the real control, then export current keep set.
   await page(()=>{const b=document.querySelector('.gcp-detail-actions .keep');if(!b||b.disabled)throw Error('GROUP_KEEP_UNAVAILABLE');b.click();return true;});
+  await waitPage(name=>[...document.querySelectorAll('.gcp-card')].some(card=>card.querySelector('.gcp-name')?.textContent===name&&card.classList.contains('card-keep')),selected.name);
   }else{
    progress('application-restart-real-photo');
    result.group={tested:false,reason:'Single real-photo project; group flow uses independent synthetic pair'};
