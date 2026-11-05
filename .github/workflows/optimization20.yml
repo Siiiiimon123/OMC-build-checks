@@ -4,6 +4,7 @@ name: R20 targeted product regression
     branches: ['verify-optimization20']
     paths: ['.github/workflows/optimization20.yml', 'opt20/**']
 permissions: {contents: read, actions: read}
+concurrency: {group: omc-optimization20-source, cancel-in-progress: true}
 jobs:
   regression:
     if: github.repository == 'Siiiiimon123/OMC-build-checks' && github.run_attempt == 1
