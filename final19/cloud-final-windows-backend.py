@@ -139,7 +139,14 @@ def main():
         '--distpath', str(work / 'dist'), '--workpath', str(work / 'analysis'), str(ai / 'build_exe_reuse.spec')]
     with (reports / 'BACKEND_COMPILE.log').open('wb') as log:
         subprocess.run(command, cwd=ai, env=env, stdout=log, stderr=subprocess.STDOUT, timeout=900, check=True)
-    executable = work / 'dist/ai-service.exe'
+    # EXE(exclude_binaries=True) in this fixed no-COLLECT spec resolves into
+    # WORKPATH, as the actual first cloud compile log records. DISTPATH's
+    # informational success line does not imply an EXE exists there.
+    executable = work / 'analysis/build_exe_reuse/ai-service.exe'
+    shutil.copyfile(closure, reports / 'BACKEND_ACTUAL_CLOSURE.json')
+    save(reports / 'BACKEND_EXECUTABLE_RESOLUTION.json', {
+        'pathRelativeToBuildWork': executable.relative_to(work).as_posix(),
+        'exists': executable.is_file(), 'compileLogSha256': sha(reports / 'BACKEND_COMPILE.log')})
     assert executable.is_file() and sha(ai / 'scripts/inference_server_onnx.py') == SOURCE_ENTRY_SHA
     desired, locations = {}, {}
     actual_closure = load(closure)

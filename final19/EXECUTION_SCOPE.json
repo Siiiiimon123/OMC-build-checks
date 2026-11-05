@@ -15,7 +15,7 @@
   "stopRepeatingSuccessfulStage": true,
   "executed": {
     "windows": 1,
-    "mac": 1
+    "mac": 2
   },
   "sameApprovedTwoPhotosOnly": true,
   "plaintextProductSourceModelsPhotosKeysPublic": false,
@@ -25,10 +25,10 @@
   "verbatim": "\u5141\u8bb8\u6309\u6b64\u8303\u56f4\u5b8c\u6210\u6700\u7ec8\u4e91\u9a8c\u6536",
   "nextSubmission": {
     "platforms": [
-      "mac"
+      "windows"
     ],
-    "macAttempt": 2,
-    "windowsFirstRunContinues": true,
-    "reason": "Actual Mac preflight readback: renamed flow path was stale"
+    "windowsAttempt": 2,
+    "macSecondRunContinues": true,
+    "reason": "Actual compiled EXE exists in no-COLLECT workpath, not dist; compiler itself succeeded"
   }
 }
