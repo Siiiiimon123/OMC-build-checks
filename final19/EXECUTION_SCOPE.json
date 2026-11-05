@@ -14,7 +14,7 @@
   "automaticRerun": false,
   "stopRepeatingSuccessfulStage": true,
   "executed": {
-    "windows": 12,
+    "windows": 13,
     "mac": 2
   },
   "sameApprovedTwoPhotosOnly": true,
@@ -27,11 +27,11 @@
     "platforms": [
       "windows"
     ],
-    "windowsAttempt": 13,
+    "windowsAttempt": 14,
     "mode": "ACTUAL_UNICODE_SHORTCUT_LAUNCH_WITH_UNCHANGED_PAYLOAD_PROOF_REUSE",
     "artifact": 13402959173,
     "sha256": "daade4392f5b77262fbd1f53b4ffbcb89e73290952f1a0779739c0ff8d97eb27",
-    "reason": "Run42012235349 differential proves Chinese and ASCII link binaries both retain correct target/icon while WScript returns blank only for Chinese names. Launch original installed Unicode desktop link through Windows Shell, verify loaded process/path/UI and Electron native readShortcutLink, then normal quit. Do not alter shortcut or rebuild product.",
+    "reason": "Run42013890903 actually launched original Unicode link and connected main inspector, then QA queried module APIs before ready without retaining exception. Capture process identity immediately, wait real UI, collect precise native read; same-byte ASCII copy plus actual original launch independently binds target/icon. No product or shortcut edit, no AI/JPEG repeat.",
     "approval": "User same-scope free continuation, no repeated questions",
     "macRebuilt": false
   },

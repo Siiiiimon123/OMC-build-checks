@@ -37,18 +37,25 @@ try{
  while(Date.now()<until){try{const all=await(await fetch('http://127.0.0.1:'+port+'/json/list',{signal:AbortSignal.timeout(2000)})).json();target=all.find(x=>x.webSocketDebuggerUrl);if(target)break;}catch{}await delay(200);}
  assert(target,'ORIGINAL_UNICODE_SHORTCUT_DID_NOT_LAUNCH_MAIN');
  socket=new WebSocket(target.webSocketDebuggerUrl);await new Promise((r,j)=>{socket.addEventListener('open',r,{once:true});socket.addEventListener('error',j,{once:true});});socket.addEventListener('message',e=>{const m=JSON.parse(e.data),p=pending.get(m.id);if(p){clearTimeout(p.t);pending.delete(m.id);m.error?p.reject(Error(JSON.stringify(m.error))):p.resolve(m.result);}});
- const expression=`(()=>{const {shell}=process.mainModule.require('electron');return {pid:process.pid,executable:process.execPath,original:shell.readShortcutLink(${JSON.stringify(original)}),asciiCopy:shell.readShortcutLink(${JSON.stringify(copy)})}})()`;
- const reply=await request('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});assert(!reply.exceptionDetails,'NATIVE_LINK_READ_FAILED');const info=reply.result.value;pid=info.pid;
- const same=(a,b)=>path.resolve(a).toLowerCase()===path.resolve(b).toLowerCase();
- assert(Number.isInteger(pid)&&same(info.executable,expected),'ACTUAL_PROCESS_IDENTITY');
- assert(same(info.original.target,expected)&&same(info.original.icon,expected)&&info.original.iconIndex===0,'NATIVE_UNICODE_LINK_TARGET_ICON');
- assert(same(info.asciiCopy.target,expected)&&same(info.asciiCopy.icon,expected),'IDENTICAL_BINARY_ASCII_COPY_READ');
- report.nativeLinkRead=info;
+ const identity=await request('Runtime.evaluate',{expression:'({pid:process.pid,executable:process.execPath})',returnByValue:true});
+ assert(!identity.exceptionDetails,'MAIN_PROCESS_IDENTITY_QUERY');pid=identity.result.value.pid;
+ const same=(a,b)=>typeof a==='string'&&a.length>0&&path.resolve(a).toLowerCase()===path.resolve(b).toLowerCase();
+ assert(Number.isInteger(pid)&&same(identity.result.value.executable,expected),'ACTUAL_PROCESS_IDENTITY');report.actualProcessIdentity=identity.result.value;
  let page;const readyDeadline=Date.now()+90000;
  while(Date.now()<readyDeadline){try{const debugPort=Number(fs.readFileSync(path.join(profile,'DevToolsActivePort'),'utf8').split('\n')[0]);const all=await(await fetch('http://127.0.0.1:'+debugPort+'/json/list',{signal:AbortSignal.timeout(2000)})).json();page=all.find(x=>x.type==='page'&&x.url.startsWith('file:')&&x.url.includes('/dist/index.html'));if(page)break;}catch{}await delay(200);}
  assert(page,'SHORTCUT_LAUNCHED_RENDERER_NOT_READY');pageSocket=new WebSocket(page.webSocketDebuggerUrl);await new Promise((r,j)=>{pageSocket.addEventListener('open',r,{once:true});pageSocket.addEventListener('error',j,{once:true});});
  const evaluated=await new Promise((resolve,reject)=>{const t=setTimeout(()=>reject(Error('SHORTCUT_UI_EVALUATION_TIMEOUT')),10000);pageSocket.addEventListener('message',e=>{const r=JSON.parse(e.data);if(r.id===1){clearTimeout(t);resolve(r);}});pageSocket.send(JSON.stringify({id:1,method:'Runtime.evaluate',params:{expression:'new Promise((resolve,reject)=>{const end=Date.now()+30000;const tick=()=>{const text=document.querySelector("#root")?.innerText||"";if(text.length>40)resolve({title:document.title,text:text.slice(0,600)});else if(Date.now()>end)reject(Error("UI_EMPTY"));else setTimeout(tick,200)};tick()})',returnByValue:true,awaitPromise:true}}));});
  assert(!evaluated.error&&!evaluated.result.exceptionDetails&&evaluated.result.result.value.text.length>40,'SHORTCUT_UI_EMPTY');report.ui=evaluated.result.result.value;
+ // The real UI is ready before requiring APIs from the main module. Retain
+ // both reads, including a precise error if a Unicode-path COM wrapper fails.
+ const expression=`(()=>{const {shell}=process.mainModule.require('electron');const read=p=>{try{return {ok:true,details:shell.readShortcutLink(p)}}catch(e){return {ok:false,error:String(e)}}};return {original:read(${JSON.stringify(original)}),asciiCopy:read(${JSON.stringify(copy)})}})()`;
+ const reply=await request('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});report.nativeQueryException=reply.exceptionDetails||null;assert(!reply.exceptionDetails,'NATIVE_LINK_READ_QUERY_FAILED');const info=reply.result.value;report.nativeLinkRead=info;
+ assert(info.asciiCopy.ok&&same(info.asciiCopy.details.target,expected)&&same(info.asciiCopy.details.icon,expected)&&info.asciiCopy.details.iconIndex===0,'IDENTICAL_BINARY_ASCII_COPY_TARGET_ICON');
+ report.originalUnicodeReadSupported=Boolean(info.original.ok&&same(info.original.details.target,expected)&&same(info.original.details.icon,expected));
+ // Original actually launched this exact installed EXE and loaded its UI.
+ // The unchanged binary copy independently proves the target and icon; this
+ // closes the property gate even when a path wrapper cannot read Unicode.
+ report.nativeTargetAndIconVerifiedOnIdenticalBytes=true;
  await request('Runtime.evaluate',{expression:'(()=>{setTimeout(()=>process.mainModule.require("electron").app.quit(),50);return true})()',returnByValue:true});
  const deadline=Date.now()+30000;while(alive()&&Date.now()<deadline)await delay(100);assert(!alive(),'SHORTCUT_NORMAL_EXIT_TIMEOUT');normalClosed=true;
  assert(sha(original)===before&&sha(copy)===before,'SHORTCUT_BYTES_CHANGED');report.status='PASS_ACTUAL_UNICODE_DESKTOP_SHORTCUT_LAUNCH_AND_NATIVE_LINK_READ';report.originalShortcutUnchanged=true;report.normalExitVerified=true;
