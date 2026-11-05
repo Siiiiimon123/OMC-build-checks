@@ -1,4 +1,4 @@
-"""Synthetic-only source acceptance on one free Windows VM. No installer claim."""
+"""Bounded source GUI acceptance on Windows/Mac VMs, not installer or full AI."""
 import os,json,hashlib,subprocess,sys,urllib.request,zipfile,time,traceback
 from pathlib import Path,PurePosixPath
 HERE=Path(__file__).resolve().parent
@@ -62,14 +62,19 @@ try:
  if sys.platform=='win32':result['priorExactSourceChecks']={'run':41950689366,'sourceTree':TREE,'corePassed':346,'browserPreviewPassed':9,'viteBuildPassed':True,'sourceUnchangedAfterChecks':True}
  else:result['priorExactSourceChecks']={'run':41952945441,'sourceTree':TREE,'coreExitCode':0,'browserPreviewExitCode':0,'viteBuildExitCode':0,'guiPassed':False}
  assert run('electron-install',['node','node_modules/electron/install.js'],600,source)==0
- for identity in ('synthetic','sample-a','sample-b'):
+ # Only the failing group path changed; both real-photo native export flows
+ # passed on this exact product source in Mac run 41978479393.
+ identities=('synthetic',) if sys.platform=='darwin' else ('synthetic','sample-a','sample-b')
+ if sys.platform=='darwin':result['priorExactSourceRealPhotoChecks']={'run':41978479393,'sourceTree':TREE,'nativeDesktopImport':True,'finishedExports':['sample-a','sample-b'],'normalRestartAndCropRestored':True,'sourceChanged':False}
+ result['casesExecuted']=list(identities)
+ for identity in identities:
   native=WORK/('native-'+identity);native.mkdir()
   args=['node',str(HERE/'cloud-finished-run.mjs'),str(source),str(native)]
   if identity!='synthetic':args.append(str(WORK/(identity+'.jpg')))
   result['checks']['jpeg-'+identity]=run('jpeg-'+identity,args,600,source)
   import shutil
   shutil.copytree(native/'evidence',EVIDENCE/('native-'+identity))
- result['syntheticOnly']=False;result['originalPhotosTransferred']=True
+ result['syntheticOnly']=all(identity=='synthetic' for identity in identities);result['originalPhotosTransferred']=True
  changed=[]
  for r in records:
   if sha((source/r['path']).read_bytes())!=r['sha256']:changed.append(r['path'])

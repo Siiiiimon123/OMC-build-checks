@@ -68,6 +68,11 @@ export async function runFinishedFlow({source,work,call,ev,until,click,snap,fixt
   const grid=await page(()=>[...document.querySelectorAll('.photo-tile')].map(e=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height};}));
   check(grid.length===fixtures.length&&(grid.length===1||!((grid[0].x<grid[1].x+grid[1].width&&grid[0].x+grid[0].width>grid[1].x)&&(grid[0].y<grid[1].y+grid[1].height&&grid[0].y+grid[0].height>grid[1].y))),'PHOTO_GRID_OVERLAP');result.grid={noOverlap:true,rectangles:grid};await snap('photo-grid');
   if(fixtures.length>1){
+  // This source-only VM has no sidecar. Preserve its failed-AI isolation and
+  // test basic grouping in a real fresh process, never by clearing a registry.
+  progress('fresh-process-before-basic-grouping');check(typeof restartApp==='function','RESTART_CALLBACK_REQUIRED');
+  result.preGroupRestart=await restartApp();
+  result.preGroupRestart.scope='Source VM has no AI runtime; fresh-process basic grouping only, not live-AI quiescence qualification';
   progress('real-basic-grouping');
   await page(async()=>{const {photoSelectionService}=await import('/src/services/photoSelectionService.js');const original=photoSelectionService.runBasicVisualGrouping;window.__omcBasicGroupingError=null;photoSelectionService.runBasicVisualGrouping=async(...args)=>{try{return await original(...args);}catch(error){window.__omcBasicGroupingError={code:String(error?.code??'UNSPECIFIED').slice(0,120),name:String(error?.name??'Error').slice(0,80)};throw error;}};return true;});
   await until('[...document.querySelectorAll(".basic-visual-grouping-panel button")].some(e=>!e.disabled&&e.innerText.trim()==="基础视觉分组，不含AI质量")');await click('基础视觉分组，不含AI质量');
