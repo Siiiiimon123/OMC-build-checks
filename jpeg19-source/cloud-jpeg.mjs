@@ -19,7 +19,8 @@ async function until(expression,ms=120000){const end=Date.now()+ms;while(Date.no
 async function click(text){assert(await ev(`(()=>{const e=[...document.querySelectorAll('button')].find(e=>e.offsetWidth&&!e.disabled&&(e.getAttribute('aria-label')===${JSON.stringify(text)}||e.innerText.trim()===${JSON.stringify(text)}));if(!e)return false;e.click();return true})()`),'BUTTON:'+text);}
 async function snap(name){const r=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});fs.writeFileSync(path.join(out,name+'.png'),Buffer.from(r.data,'base64'));}
 try{
- assert(process.env.GITHUB_ACTIONS==='true'&&process.env.GITHUB_REPOSITORY==='Siiiiimon123/OMC-build-checks'&&process.env.GITHUB_REF==='refs/heads/verify-jpeg19-cloud','CLOUD_SCOPE');
+ const expectedBranch=process.platform==='darwin'?'refs/heads/verify-jpeg19-mac':'refs/heads/verify-jpeg19-cloud';
+ assert(['win32','darwin'].includes(process.platform)&&process.env.GITHUB_ACTIONS==='true'&&process.env.GITHUB_REPOSITORY==='Siiiiimon123/OMC-build-checks'&&process.env.GITHUB_REF===expectedBranch,'CLOUD_SCOPE');
  let fixture=providedFixture,width=null,height=null;
  if(!fixture){width=8192;height=5464;const rgba=Buffer.alloc(width*height*4);
   for(let y=0;y<height;y++)for(let x=0;x<width;x++){const i=(y*width+x)*4,c=((x>>5)^(y>>5))&1;rgba[i]=40+(x%160);rgba[i+1]=35+(y%165);rgba[i+2]=c?155:60;rgba[i+3]=255;}
@@ -27,10 +28,11 @@ try{
  }else{report.syntheticOnly=false;report.memberDataUsed=true;}
  originalPath=fixture;const encoded=fs.readFileSync(fixture);report.original={width,height,bytes:encoded.length,sha256:hash(encoded)};
  report.stage='launch';
- vite=spawn(process.execPath,[path.join(source,'node_modules/vite/bin/vite.js'),'--host','127.0.0.1','--port','5173','--strictPort'],{cwd:source,env,stdio:['ignore',log,log]});
+ vite=spawn(process.execPath,[path.join(source,'node_modules/vite/bin/vite.js'),'--host','127.0.0.1','--port','5173','--strictPort'],{cwd:source,env,stdio:['ignore',log,log],detached:process.platform==='darwin'});
  let ready=false;for(let i=0;i<100;i++){try{ready=(await fetch('http://127.0.0.1:5173')).ok;if(ready)break;}catch{}await delay(200);}assert(ready,'VITE_START');
  const profile=path.join(work,'profile');
- app=spawn(path.join(source,'node_modules/electron/dist/electron.exe'),[source,'--user-data-dir='+profile,'--remote-debugging-port=0','--no-first-run'],{cwd:source,env,stdio:['ignore',log,log]});
+ const executable=process.platform==='darwin'?'node_modules/electron/dist/Electron.app/Contents/MacOS/Electron':'node_modules/electron/dist/electron.exe';
+ app=spawn(path.join(source,executable),[source,'--user-data-dir='+profile,'--remote-debugging-port=0','--no-first-run'],{cwd:source,env,stdio:['ignore',log,log],detached:process.platform==='darwin'});
  let target;for(let i=0;i<200;i++){try{const port=Number(fs.readFileSync(path.join(profile,'DevToolsActivePort'),'utf8').split('\n')[0]);const rows=await(await fetch('http://127.0.0.1:'+port+'/json/list')).json();target=rows.find(x=>x.type==='page'&&x.url.startsWith('http://localhost:5173'));if(target)break;}catch{}await delay(250);}assert(target,'NORMAL_SOURCE_MAIN_NOT_FOUND');
  ws=new WebSocket(target.webSocketDebuggerUrl);await new Promise((r,j)=>{ws.addEventListener('open',r,{once:true});ws.addEventListener('error',j,{once:true});});ws.addEventListener('message',e=>{const m=JSON.parse(e.data),p=pending.get(m.id);if(p){pending.delete(m.id);clearTimeout(p.t);m.error?p.reject(Error(JSON.stringify(m.error))):p.resolve(m.result);}});
  await call('Runtime.enable');await call('Page.enable');await call('Emulation.setDeviceMetricsOverride',{width:1600,height:1000,deviceScaleFactor:1,mobile:false});
@@ -66,5 +68,5 @@ try{
  assert(hash(fs.readFileSync(fixture))===report.original.sha256,'ORIGINAL_MODIFIED');
  report.status='PASS_SOURCE_JPEG';report.stage='done';report.limitations=['Source dev entry, not installed package',providedFixture?'Authorized real photo':'Synthetic photo','No AI runtime acceptance','CDP real controls and file input, not manual OS picker','Export and group workflow still require separate acceptance'];
 }catch(e){report.status='FAIL';report.error=String(e.stack||e);try{report.dom=await ev('document.body.innerText.slice(0,14000)');await snap('failure');}catch{}}
-finally{if(originalPath&&fs.existsSync(originalPath)){report.originalAfterSha256=hash(fs.readFileSync(originalPath));report.originalUnchanged=report.originalAfterSha256===report.original?.sha256;}try{ws?.close();}catch{}for(const p of [app,vite])if(p?.pid){await new Promise(resolve=>{const k=spawn('taskkill',['/PID',String(p.pid),'/T','/F'],{stdio:'ignore'});k.on('exit',resolve);});}fs.writeFileSync(path.join(out,'JPEG_FUNCTIONAL.json'),JSON.stringify(report,null,2));fs.closeSync(log);}
+finally{if(originalPath&&fs.existsSync(originalPath)){report.originalAfterSha256=hash(fs.readFileSync(originalPath));report.originalUnchanged=report.originalAfterSha256===report.original?.sha256;}try{ws?.close();}catch{}for(const p of [app,vite])if(p?.pid){if(process.platform==='darwin'){try{process.kill(-p.pid,'SIGTERM');}catch(e){if(e.code!=='ESRCH')throw e;}}else{await new Promise(resolve=>{const k=spawn('taskkill',['/PID',String(p.pid),'/T','/F'],{stdio:'ignore'});k.on('exit',resolve);});}}fs.writeFileSync(path.join(out,'JPEG_FUNCTIONAL.json'),JSON.stringify(report,null,2));fs.closeSync(log);}
 if(report.status==='FAIL')process.exitCode=1;

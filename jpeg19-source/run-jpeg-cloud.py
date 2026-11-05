@@ -31,8 +31,9 @@ def run(name,args,timeout=600,cwd=None,private=False):
 result={'schema':'omc-cloud-source-stage-v1','sourceTree':TREE,'status':'RUNNING','syntheticOnly':True,'originalPhotosTransferred':False,'installedPackageTested':False,'checks':{}}
 try:
  assert os.environ.get('GITHUB_ACTIONS')=='true' and os.environ.get('GITHUB_REPOSITORY')=='Siiiiimon123/OMC-build-checks'
- assert os.environ.get('GITHUB_REF')=='refs/heads/verify-jpeg19-cloud' and os.environ.get('GITHUB_RUN_ATTEMPT')=='1'
- assert sys.platform=='win32' and not WORK.exists()
+ expected_branch='refs/heads/verify-jpeg19-mac' if sys.platform=='darwin' else 'refs/heads/verify-jpeg19-cloud'
+ assert os.environ.get('GITHUB_REF')==expected_branch and os.environ.get('GITHUB_RUN_ATTEMPT')=='1'
+ assert sys.platform in ('win32','darwin') and not WORK.exists()
  EVIDENCE.mkdir(parents=True)
  phase('authenticated_source_input')
  cfg=json.loads((HERE/'INPUT.json').read_text())
@@ -55,9 +56,13 @@ try:
    b=z.read(row);r=by[name];assert len(b)==r['bytes'] and sha(b)==r['sha256'] and gitsha('blob',b)==r['gitBlobSha1']
    dest=source.joinpath(*p.parts);dest.parent.mkdir(parents=True,exist_ok=True);dest.write_bytes(b)
  assert json.loads((source/'package.json').read_bytes())['version']=='1.0.21-preview.19'
- assert run('npm-ci',['npm.cmd','ci','--ignore-scripts','--no-audit','--no-fund'],900,source)==0
+ npm='npm.cmd' if sys.platform=='win32' else 'npm'
+ assert run('npm-ci',[npm,'ci','--ignore-scripts','--no-audit','--no-fund'],900,source)==0
  # Exact unchanged source already passed these on VM41950689366; do not repeat.
- result['priorExactSourceChecks']={'run':41950689366,'sourceTree':TREE,'corePassed':346,'browserPreviewPassed':9,'viteBuildPassed':True,'sourceUnchangedAfterChecks':True}
+ if sys.platform=='win32':result['priorExactSourceChecks']={'run':41950689366,'sourceTree':TREE,'corePassed':346,'browserPreviewPassed':9,'viteBuildPassed':True,'sourceUnchangedAfterChecks':True}
+ else:
+  for name,cmd in [('core',[npm,'run','test:core']),('browser-preview',[npm,'run','test:browser-preview']),('vite-build',['node','node_modules/vite/bin/vite.js','build','--outDir',str(WORK/'frontend/dist')])]:
+   result['checks'][name]=run(name,cmd,900,source)
  assert run('electron-install',['node','node_modules/electron/install.js'],600,source)==0
  for identity in ('synthetic','sample-a','sample-b'):
   native=WORK/('native-'+identity);native.mkdir()
