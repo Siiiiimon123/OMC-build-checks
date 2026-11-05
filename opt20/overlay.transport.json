@@ -3,12 +3,12 @@
   "assets": [
     {
       "id": "r20-overlay",
-      "plaintextBytes": 53892,
-      "plaintextSha256": "4bf16c188cde0a37146914930fd4b02fcadb2e58ae920e0194faf6aee8402f9f",
-      "ciphertextBytes": 53892,
-      "nonceHex": "9648847164ae7ef01e2203ec",
-      "ciphertextSha256": "58b65fa8b6ce1b04766c16d1a0fc1855348c23af9edeb1fdf732ff2204c6010d",
-      "tagHex": "ef7f23cad30fcb5a117b0fd48f8de9d2"
+      "plaintextBytes": 63251,
+      "plaintextSha256": "b00f2ffc3be82e1e99876112ab8a9d6d1209c225737938129308f4595f3fff3e",
+      "ciphertextBytes": 63251,
+      "nonceHex": "3224115391a9d7f7eae4aea5",
+      "ciphertextSha256": "a2cbbc24e4a16bbb65f3176c15dcd20dfe34cea2173616e1acb2184df5c4eb13",
+      "tagHex": "d4658be5c2edb8fc46a917e4e2f0b794"
     }
   ]
 }
