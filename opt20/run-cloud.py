@@ -103,6 +103,9 @@ try:
         raise RuntimeError('DEPENDENCY_PREPARATION_FAILED')
     if os.environ.get('OMC_R20_SOURCE_GUARDS_ONLY')=='1':
         checks=[]
+        if os.environ.get('OMC_R24_ANALYSIS_YIELD')=='1':
+            checks.append(stage('analysis-yield-contracts',['node','--test','--test-name-pattern','analysis yield',
+                'src/services/analysisPerformance.test.js'],source))
         if os.environ.get('OMC_R23_TECHNICAL_AND_PREVIEW')=='1':
             checks.append(stage('directional-triage-and-neutral-preview-contracts',['node','--test',
                 'src/services/ai/technicalWasteEvaluator.test.js',
@@ -134,6 +137,13 @@ try:
                 child_env['OMC_R20_VIEWPORT']='compact'
                 checks.append(stage('native-neutral-advanced-jpeg-display',['node',str(HERE/'cloud-finished-run.mjs'),
                     str(source),str(case)],source,timeout=600))
+        if all(checks) and os.environ.get('OMC_R24_ANALYSIS_YIELD')=='1':
+            child_env.pop('ELECTRON_SKIP_BINARY_DOWNLOAD',None)
+            checks.append(stage('electron-runtime',['node','node_modules/electron/install.js'],source,timeout=300))
+            if all(checks):
+                case=REPORTS/'native-analysis-yield';case.mkdir()
+                checks.append(stage('native-analysis-yield-and-input-cancel',['node',str(HERE/'cloud-analysis-yield.mjs'),
+                    str(source),str(case)],source,timeout=180))
         ok=all(checks)
         raise SystemExit(0 if ok else 1)
     if os.environ.get('OMC_R20_ENGINE_BASELINE')=='1':

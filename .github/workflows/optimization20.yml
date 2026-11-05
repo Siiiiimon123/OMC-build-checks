@@ -13,6 +13,7 @@ jobs:
       matrix:
         include:
           - {os: windows-2025, arch: x64}
+          - {os: macos-15, arch: arm64}
     runs-on: '${{ matrix.os }}'
     timeout-minutes: 20
     steps:
@@ -33,7 +34,8 @@ jobs:
           OMC_R20_COMMIT_WAVE: '0'
           OMC_R21_INCREMENTAL: '0'
           OMC_R22_NEUTRAL_DISPLAY: '0'
-          OMC_R23_TECHNICAL_AND_PREVIEW: '1'
+          OMC_R23_TECHNICAL_AND_PREVIEW: '0'
+          OMC_R24_ANALYSIS_YIELD: '1'
           OMC_R20_TIMING_ONLY: '1'
           OMC_R20_FAST_DISPLAY: '1'
           OMC_R20_FINISHED_FLOW: '0'
