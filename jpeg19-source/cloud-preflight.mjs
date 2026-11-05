@@ -18,4 +18,10 @@ assert.equal(await evaluate('Boolean(await Promise.resolve(true))'),true);
 assert.equal(await evaluate('Boolean(await (document.querySelector("missing")?.complete))'),false);
 assert.equal(await evaluate('({a:1})').then(x=>x.a),1);
 await assert.rejects(evaluate('(()=>{throw Error("expected")})()'),/RENDERER_EVAL/);
-console.log('PASS: actual CDP evaluation helper supports async, missing elements and errors');
+let parsed=0;
+for(const match of text.matchAll(/(?:ev|until)\((('(?:\\.|[^'\\])*')|("(?:\\.|[^"\\])*")|(`(?:\\.|[^`\\])*`))(?=\s*[,)])/g)){
+ const expression=new vm.Script(match[1]).runInNewContext();
+ new vm.Script('(async()=>{return ('+expression+');})()');parsed++;
+}
+assert(parsed>=15);
+console.log('PASS: actual CDP helper and '+parsed+' embedded expressions parsed; async, missing elements and errors handled');

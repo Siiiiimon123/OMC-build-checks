@@ -1,23 +1,34 @@
 {
-  "schema": "omc-cloud-execution-scope-v3",
-  "authorization": "Two-photo cloud acceptance approved in call_0c6b1e5e82374bfa81e789eef93720bc; card allows one initial Windows run and up to two manual repair runs",
+  "schema": "omc-cloud-execution-scope-v4",
+  "authorization": "call_0c6b1e5e82374bfa81e789eef93720bc; initial Windows plus at most two manual repair runs",
   "photoAuthorizedRound": {
     "completedRuns": [
-      41950689366
+      41950689366,
+      41951299063
     ],
-    "next": "First manual repair run; same source and exact same two photos",
+    "next": "Second and final manual repair run within this card",
     "maxWindowsRuns": 3,
     "maxMinutesEach": 60,
     "costLimitUSD": 0,
     "automaticRerun": false
   },
-  "preConsentSourceNetworkFailures": [
-    41883754081,
-    41883937874
-  ],
   "sourceTree": "1e39b9ae2921480b27d4a1a8bf5f8499004886fa",
-  "fix": "Actual CDP helper async expression and Boolean wait; cloud preflight tests the actual helper first",
-  "scope": "Existing authenticated ciphertext only; no new models, photos, secrets or main changes",
+  "sourceChecks": {
+    "run": 41950689366,
+    "core": 346,
+    "browserPreview": 9,
+    "viteBuild": true,
+    "unchangedSource": true
+  },
+  "fixes": [
+    "Keep anonymous original .jpg extension",
+    "Parse embedded literal expressions on VM before product launch",
+    "Correct nested selector quotes",
+    "Dismiss actual onboarding before pointer drag",
+    "Check persisted adjustment after reopen"
+  ],
+  "sameTwoPhotos": true,
+  "noNewSecret": true,
   "productionChange": false,
   "installerAcceptance": false
 }

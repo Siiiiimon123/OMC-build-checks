@@ -37,7 +37,7 @@ try:
  phase('authenticated_source_input')
  cfg=json.loads((HERE/'INPUT.json').read_text())
  for asset in cfg['assets']:
-  target=WORK/(asset['id']+'.enc');meta=WORK/(asset['id']+'.json');plain=WORK/(asset['id']+'.plain');save(meta,asset)
+  target=WORK/(asset['id']+'.enc');meta=WORK/(asset['id']+'.json');plain=WORK/(asset['id']+('.jpg' if asset['id'].startswith('sample-') else '.plain'));save(meta,asset)
   # Authenticated ciphertext travels in this Git checkout, avoiding a failing source TLS path.
   parts=sorted((HERE/'inputs'/asset['id']).glob('*.enc'));assert len(parts)==(asset['ciphertextBytes']+65535)//65536
   with target.open('xb') as f:
@@ -62,7 +62,7 @@ try:
  for identity in ('synthetic','sample-a','sample-b'):
   native=WORK/('native-'+identity);native.mkdir()
   args=['node',str(HERE/'cloud-jpeg.mjs'),str(source),str(native)]
-  if identity!='synthetic':args.append(str(WORK/(identity+'.plain')))
+  if identity!='synthetic':args.append(str(WORK/(identity+'.jpg')))
   result['checks']['jpeg-'+identity]=run('jpeg-'+identity,args,900,source)
   import shutil
   shutil.copytree(native/'evidence',EVIDENCE/('native-'+identity))
