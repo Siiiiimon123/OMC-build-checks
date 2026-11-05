@@ -74,7 +74,8 @@ def main():
         'dnsOrFeedModified': False, 'feeUSD': 0}
     private_env = dict(os.environ)
     clean_env = {k: v for k, v in private_env.items()
-                 if k not in ('OMC_PREVIEW15_TRANSPORT_KEY', 'GITHUB_TOKEN', 'GH_TOKEN')}
+                 if k not in ('OMC_PREVIEW15_TRANSPORT_KEY', 'GITHUB_TOKEN', 'GH_TOKEN')
+                 and k.lower() != 'psmodulepath'}
 
     def run(label, argv, cwd=None, timeout=1200, private=False):
         print(json.dumps({'phase': label}), flush=True)
@@ -146,7 +147,9 @@ def main():
         shutil.copyfile(WORK / 'source19-records.plain', inputs / 'source19-records.json')
         if sys.platform == 'win32':
             # Parse the actual decrypted PowerShell files before large downloads.
-            ps = "$ErrorActionPreference='Stop';"
+            # Windows PowerShell must construct its own compatible module path,
+            # rather than inheriting the runner's PowerShell7-only locations.
+            ps = "$ErrorActionPreference='Stop';Get-Command Get-FileHash,Get-CimInstance,Start-Process,ConvertFrom-Json -ErrorAction Stop|Out-Null;"
             for file in inputs.glob('*.ps1'):
                 literal = str(file).replace("'", "''")
                 ps += "$t=$null;$e=$null;[void][System.Management.Automation.Language.Parser]::ParseFile('" + literal + "',[ref]$t,[ref]$e);if($e.Count){throw ($e|Out-String)};"
