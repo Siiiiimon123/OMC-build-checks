@@ -116,6 +116,9 @@ try:
         raise SystemExit(0 if ok else 1)
     if os.environ.get('OMC_R20_SOURCE_GUARDS_ONLY')=='1':
         checks=[]
+        if os.environ.get('OMC_R25_INFERENCE_WAVE')=='1':
+            checks.append(stage('inference-wave-contracts',['node','--test',
+                'src/services/ai/modelLoaderBatch.test.js'],source))
         if os.environ.get('OMC_R24_ANALYSIS_YIELD')=='1':
             checks.append(stage('analysis-yield-contracts',['node','--test','--test-name-pattern','analysis yield',
                 'src/services/analysisPerformance.test.js'],source))
