@@ -122,6 +122,14 @@ try:
                 child_env['OMC_R20_VIEWPORT']='compact'
                 checks.append(stage('native-incremental-jpeg-commit-recovery',['node',str(HERE/'cloud-recovery-run.mjs'),
                     str(source),str(case)],source,timeout=1200))
+        if all(checks) and os.environ.get('OMC_R22_NEUTRAL_DISPLAY')=='1':
+            child_env.pop('ELECTRON_SKIP_BINARY_DOWNLOAD',None)
+            checks.append(stage('electron-runtime',['node','node_modules/electron/install.js'],source,timeout=300))
+            if all(checks):
+                case=REPORTS/'native-neutral-display';case.mkdir()
+                child_env['OMC_R20_VIEWPORT']='compact'
+                checks.append(stage('native-neutral-advanced-jpeg-display',['node',str(HERE/'cloud-finished-run.mjs'),
+                    str(source),str(case)],source,timeout=600))
         ok=all(checks)
         raise SystemExit(0 if ok else 1)
     if os.environ.get('OMC_R20_ENGINE_BASELINE')=='1':

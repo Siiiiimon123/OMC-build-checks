@@ -25,7 +25,7 @@ try{
  const expectedBranch='refs/heads/verify-optimization20';
  assert(['win32','darwin'].includes(process.platform)&&process.env.GITHUB_ACTIONS==='true'&&process.env.GITHUB_REPOSITORY==='Siiiiimon123/OMC-build-checks'&&process.env.GITHUB_REF===expectedBranch,'CLOUD_SCOPE');
  let fixture=providedFixture,width=null,height=null,nearFixture=null;
- if(!fixture){width=8192;height=5464;const rgba=Buffer.alloc(width*height*4);
+ if(!fixture){width=process.env.OMC_R22_NEUTRAL_DISPLAY==='1'?2304:8192;height=process.env.OMC_R22_NEUTRAL_DISPLAY==='1'?1536:5464;const rgba=Buffer.alloc(width*height*4);
   for(let y=0;y<height;y++)for(let x=0;x<width;x++){const i=(y*width+x)*4,c=((x>>5)^(y>>5))&1;rgba[i]=40+(x%160);rgba[i+1]=35+(y%165);rgba[i+2]=c?155:60;rgba[i+3]=255;}
   fixture=path.join(work,'synthetic-large.jpg');fs.writeFileSync(fixture,jpeg.encode({data:rgba,width,height},88).data);
   // Independently generated near-match; no additional member photograph.
@@ -92,6 +92,28 @@ try{
   report.lateWorkerSwitch={actualOldResultHeld:true,oldProxyWidth:held.width,currentSourceWidth:sourceWidth,observedWidths:widths};
   await until('document.querySelector(".exposure-dialog")?.dataset.previewQuality==="refined"',120000);
  }
+ if(process.env.OMC_R22_NEUTRAL_DISPLAY==='1'){
+  report.stage='neutral-advanced-recipe-display';report.neutralAdvancedRecipes=[];
+  await ev(`(async()=>{
+   const {photoSelectionService:service}=await import('/src/services/photoSelectionService.js');
+   const original=service.previewJpegExposure;
+   service.previewJpegExposure=async(...args)=>{const result=await original(...args);window.__r22LastRecipe=result.recipe;return result;};
+   return true;
+  })()`);
+  for(const [label,schema,key] of [['高光强度','omc-jpeg-edit-v5','highlightsAmount'],
+    ['自然饱和度强度','omc-jpeg-edit-v6','vibranceAmount'],['纹理强度','omc-jpeg-edit-v7','textureAmount']]){
+   const selector='input[type="range"][aria-label="'+label+'"]';
+   assert(await ev(`(()=>{const e=document.querySelector(${JSON.stringify(selector)});if(!e)return false;const d=e.closest('details');if(!d.open)d.querySelector('summary').click();return true})()`),'ADVANCED_CONTROL_PRESENT:'+label);
+   await until(`document.querySelector(${JSON.stringify(selector)})?.offsetWidth>0`);
+   assert(await ev(`(()=>{const e=document.querySelector(${JSON.stringify(selector)});e.scrollIntoView({block:'center'});e.focus();return document.activeElement===e&&Number(e.value)===0})()`),'ADVANCED_CONTROL_NEUTRAL_FOCUS:'+label);
+   for(const [keyName,code] of [['ArrowRight',39],['ArrowLeft',37]]){
+    for(const type of ['keyDown','keyUp'])await call('Input.dispatchKeyEvent',{type,key:keyName,code:keyName,windowsVirtualKeyCode:code});
+    const value=keyName==='ArrowRight'?1:0;
+    await until(`window.__r22LastRecipe?.schemaVersion===${JSON.stringify(schema)}&&window.__r22LastRecipe[${JSON.stringify(key)}]===${value}&&document.querySelector('.exposure-dialog')?.dataset.previewQuality==='refined'`,120000);
+   }
+   report.neutralAdvancedRecipes.push({schema,key,nonzeroThenZeroThroughRealControl:true,actualRefinedRecipe:await ev('window.__r22LastRecipe')});
+  }
+ }
  report.stage='drag';
  const bounds=await ev(`(()=>{const e=document.querySelector('input[type="range"][aria-label="曝光 EV"]');e.scrollIntoView({block:"center"});const r=e.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height,min:Number(e.min),max:Number(e.max)}})()`);
  await ev('(()=>{window.__omcCloudFrames=[];const s=document.querySelector(".exposure-dialog");window.__omcCloudObserver=new MutationObserver(()=>{if(window.__omcCloudFrames.length<2000)window.__omcCloudFrames.push({at:performance.now(),quality:s.dataset.previewQuality,backend:s.dataset.previewBackend,liveDraft:s.dataset.previewLiveDraft,feedback:s.dataset.previewFeedbackMs,timing:JSON.parse(s.dataset.previewTiming??"null"),images:[...document.querySelectorAll(".single-photo-view .highres-viewer[data-adjustment-preview=effect] img")].map(i=>i.currentSrc.slice(-100))})});window.__omcCloudObserver.observe(document.body,{subtree:true,attributes:true,attributeFilter:["src","data-preview-feedback-ms","data-preview-quality","data-preview-timing","data-preview-live-draft"]});return true})()');
@@ -137,7 +159,11 @@ try{
  report.finishedFlow=await runFinishedFlow({source,work,call,ev,until,click,snap,fixtures:fixtureRows,restartApp});
  assert(fixtureRows.every(f=>hash(fs.readFileSync(f.path))===f.sha256),'ORIGINAL_MODIFIED');
  }
- report.status=process.env.OMC_R20_TIMING_ONLY==='1'&&process.env.OMC_R20_FINISHED_FLOW!=='1'?'PASS_SOURCE_PREVIEW_PHASE_MEASUREMENT':'PASS_SOURCE_FINISHED_JPEG_FLOW';report.stage='done';report.limitations=['Source dev entry, not installed package',providedFixture?'Authorized real photo':'Synthetic photo','No AI runtime acceptance','CDP real controls and file input, not manual OS picker','Folder picker is adapted in main memory; manual OS chooser not tested','Final self-contained installer, complete AI and in-app upgrade require separate acceptance'];
+ if(process.env.OMC_R22_NEUTRAL_DISPLAY==='1'){
+  assert(report.frames.some(f=>f.backend==='display-channel-filter'),'NEUTRAL_ADVANCED_RECIPE_LOST_LIVE_DISPLAY');
+  assert((await ev('window.__r22LastRecipe.schemaVersion'))==='omc-jpeg-edit-v7','ADVANCED_RECIPE_WAS_DOWNGRADED');
+ }
+ report.status=process.env.OMC_R22_NEUTRAL_DISPLAY==='1'?'PASS_SOURCE_NEUTRAL_ADVANCED_LIVE_DISPLAY':process.env.OMC_R20_TIMING_ONLY==='1'&&process.env.OMC_R20_FINISHED_FLOW!=='1'?'PASS_SOURCE_PREVIEW_PHASE_MEASUREMENT':'PASS_SOURCE_FINISHED_JPEG_FLOW';report.stage='done';report.limitations=['Source dev entry, not installed package',providedFixture?'Authorized real photo':'Synthetic photo','No AI runtime acceptance','CDP real controls and file input, not manual OS picker','Folder picker is adapted in main memory; manual OS chooser not tested','Final self-contained installer, complete AI and in-app upgrade require separate acceptance'];
 }catch(e){report.status='FAIL';report.error=String(e.stack||e);try{report.dom=await ev('document.body.innerText.slice(0,14000)');await snap('failure');}catch{}}
 finally{
  if(originalPath&&fs.existsSync(originalPath)){report.originalAfterSha256=hash(fs.readFileSync(originalPath));report.originalUnchanged=report.originalAfterSha256===report.original?.sha256;}
