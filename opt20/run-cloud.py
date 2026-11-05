@@ -1,6 +1,7 @@
 """Source-only cloud regression. No photo/model/runtime download or publication."""
 from pathlib import Path, PurePosixPath
 import hashlib
+import base64
 import json
 import os
 import subprocess
@@ -22,6 +23,8 @@ if hashlib.sha256(TRANSPORT.read_bytes()).hexdigest()!=EXPECTED_TRANSPORT:
     raise RuntimeError('TRANSPORT_IDENTITY_MISMATCH')
 child_env=dict(os.environ)
 child_env.pop('OMC_PREVIEW15_TRANSPORT_KEY',None)
+child_env.pop('GH_TOKEN',None)
+child_env.pop('GITHUB_TOKEN',None)
 child_env['PYTHONDONTWRITEBYTECODE']='1'
 child_env['ELECTRON_SKIP_BINARY_DOWNLOAD']='1'
 child_env['npm_config_audit']='false'
@@ -54,9 +57,14 @@ try:
             if p.is_absolute() or '..' in p.parts or '\\' in item.filename or not item.filename or item.file_size>16*1024*1024:
                 raise RuntimeError('INVALID_SOURCE_ARCHIVE')
         z.extractall(source)
+    (WORK/'baseline-imageAnalyzer.js').write_bytes((source/'src/services/imageAnalyzer.js').read_bytes())
     if (HERE/'overlay.enc').exists():
         overlay=WORK/'overlay.zip'
-        if not stage('authenticate-overlay',['node',str(TRANSPORT),'decrypt','--input',str(HERE/'overlay.enc'),
+        overlay_cipher=HERE/'overlay.enc'
+        if (HERE/'overlay.b64').exists():
+            overlay_cipher=WORK/'overlay.enc'
+            overlay_cipher.write_bytes(base64.b64decode((HERE/'overlay.b64').read_text(encoding='ascii'),validate=True))
+        if not stage('authenticate-overlay',['node',str(TRANSPORT),'decrypt','--input',str(overlay_cipher),
             '--manifest',str(HERE/'overlay.transport.json'),'--id','r20-overlay','--output',str(overlay)],private_env=True):
             raise RuntimeError('OVERLAY_AUTHENTICATION_FAILED')
         with zipfile.ZipFile(overlay) as z:
@@ -102,6 +110,11 @@ try:
                 '-s','ai-training/tests','-p','test_technical_probability_precision.py'],source))
         else:
             checks.append(False)
+    if (HERE/'readout-input.json').exists() and all(checks):
+        checks.append(stage('grouping-kernel-benchmark',['node',str(HERE/'benchmark-grouping.mjs'),
+            str(source),str(WORK/'baseline-imageAnalyzer.js'),str(REPORTS/'GROUPING_KERNEL_BENCH.json')],timeout=120))
+        checks.append(stage('prior-native-evidence-readout',['node',str(HERE/'thin-evidence.cjs'),
+            str(source),str(TRANSPORT),str(HERE/'readout-input.json'),str(REPORTS)],timeout=360,private_env=True))
     if native_ui and all(checks):
         child_env.pop('ELECTRON_SKIP_BINARY_DOWNLOAD',None)
         if not stage('electron-runtime',['node','node_modules/electron/install.js'],source,timeout=300):
@@ -152,8 +165,16 @@ finally:
     packed=WORK/'reports.zip'
     with zipfile.ZipFile(packed,'x',compression=zipfile.ZIP_DEFLATED) as z:
         for file in sorted(REPORTS.rglob('*')):
-            if file.is_file():
-                z.write(file,file.relative_to(REPORTS).as_posix())
+            rel=file.relative_to(REPORTS)
+            if not file.is_file():
+                continue
+            # Retain actual evidence, not browser profiles or source/export
+            # fixture copies. Existing full artifacts remain available.
+            root_log=len(rel.parts)==1 and file.suffix in ('.log','.json')
+            readout=len(rel.parts)>1 and rel.parts[0].startswith('readout-')
+            native=len(rel.parts)>=3 and rel.parts[0].startswith('native-') and rel.parts[1]=='evidence' and file.suffix=='.json'
+            if root_log or readout or native:
+                z.write(file,rel.as_posix())
     subprocess.run(['node',str(TRANSPORT),'encrypt','--input',str(packed),
         '--output',str(ENCRYPTED/'reports.enc'),'--manifest',str(ENCRYPTED/'REPORTS_READY.json'),
         '--id','r20-reports'],check=True)
