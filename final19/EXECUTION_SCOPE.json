@@ -14,7 +14,7 @@
   "automaticRerun": false,
   "stopRepeatingSuccessfulStage": true,
   "executed": {
-    "windows": 8,
+    "windows": 9,
     "mac": 2
   },
   "sameApprovedTwoPhotosOnly": true,
@@ -27,11 +27,11 @@
     "platforms": [
       "windows"
     ],
-    "windowsAttempt": 9,
+    "windowsAttempt": 10,
     "mode": "ACCEPT_EXISTING_FROZEN_INSTALLER_NO_BUILD",
     "artifact": 13402959173,
     "sha256": "daade4392f5b77262fbd1f53b4ffbcb89e73290952f1a0779739c0ff8d97eb27",
-    "reason": "Read run42005421800: frozen installer download/decryption passed, WindowsPowerShell command discovery failed before installation. Isolate inherited PSModulePath and preflight exact commands before download.",
+    "reason": "Actual run42006404732 first installation and every payload file hash passed; QA desktop scan encountered unrelated link with empty target. Exclude only empty targets while preserving exact one OMC shortcut requirement.",
     "approval": "User same-scope free continuation, no repeated questions",
     "macRebuilt": false
   },
