@@ -30,7 +30,8 @@ jobs:
           OMC_R20_ENGINE_BASELINE: '0'
           OMC_R20_CHANGED_BATCHER: '0'
           OMC_R20_SOURCE_GUARDS_ONLY: '1'
-          OMC_R20_COMMIT_WAVE: '1'
+          OMC_R20_COMMIT_WAVE: '0'
+          OMC_R21_INCREMENTAL: '1'
           GH_TOKEN: '${{ github.token }}'
         run: python opt20/run-cloud.py
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9

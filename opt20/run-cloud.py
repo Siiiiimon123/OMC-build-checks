@@ -75,7 +75,8 @@ try:
                 if p.is_absolute() or '..' in p.parts or '\\' in row['path']:
                     raise RuntimeError('INVALID_OVERLAY_PATH')
                 target=source/row['path']
-                if hashlib.sha256(target.read_bytes()).hexdigest()!=row['beforeSha256']:
+                if (target.exists() if row['beforeSha256'] is None
+                    else not target.is_file() or hashlib.sha256(target.read_bytes()).hexdigest()!=row['beforeSha256']):
                     raise RuntimeError('OVERLAY_BASE_MISMATCH')
                 data=z.read(row['path'])
                 if hashlib.sha256(data).hexdigest()!=row['sha256']:
@@ -102,6 +103,9 @@ try:
         raise RuntimeError('DEPENDENCY_PREPARATION_FAILED')
     if os.environ.get('OMC_R20_SOURCE_GUARDS_ONLY')=='1':
         checks=[]
+        if os.environ.get('OMC_R21_INCREMENTAL')=='1':
+            checks.append(stage('source-recovery-compatibility',['node','--test','src/services/sourceRecoveryEdits.test.js',
+                'src/services/sourceRecoveryGroupPreservation.test.js'],source))
         if os.environ.get('OMC_R20_COMMIT_WAVE')=='1':
             checks.append(stage('durable-analysis-wave-contracts',['node','--test','src/services/analysisPerformance.test.js',
                 'src/services/analysisTerminalCommit.test.js','src/services/ai/modelLoaderBatch.test.js'],source))
@@ -110,6 +114,14 @@ try:
         previous=source/'preview-manifest.json'
         if previous.exists():previous.rename(REPORTS/'previous-preview-manifest.json')
         checks.append(stage('build-browser-preview',[npm,'run','build:browser-preview'],source))
+        if all(checks) and os.environ.get('OMC_R21_INCREMENTAL')=='1' and os.name=='nt':
+            child_env.pop('ELECTRON_SKIP_BINARY_DOWNLOAD',None)
+            checks.append(stage('electron-runtime',['node','node_modules/electron/install.js'],source,timeout=300))
+            if all(checks):
+                case=REPORTS/'native-incremental';case.mkdir()
+                child_env['OMC_R20_VIEWPORT']='compact'
+                checks.append(stage('native-incremental-jpeg-commit-recovery',['node',str(HERE/'cloud-recovery-run.mjs'),
+                    str(source),str(case)],source,timeout=1200))
         ok=all(checks)
         raise SystemExit(0 if ok else 1)
     if os.environ.get('OMC_R20_ENGINE_BASELINE')=='1':

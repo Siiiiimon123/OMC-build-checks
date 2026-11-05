@@ -83,7 +83,10 @@ try{
    const projects=tx.objectStore('projects').getAll();projects.onsuccess=()=>{
     if(projects.result.length!==1){result.projectCount=projects.result.length;return;}
     const p=projects.result[0];result.projectCount=1;result.project={id:p.id,count:p.count,progress:p.progress,
-      importState:p.importState,manifestCount:p.importTaskManifest?.length,failures:p.importFailures?.length??0};
+      importState:p.importState,manifestCount:p.importTaskManifest?.length,failures:p.importFailures?.length??0,
+      manifestVersion:p.importTaskManifestVersion??1,
+      verifiedTasks:p.importTaskManifest?.filter(row=>row.sourceVerification==='verified').length??0,
+      pendingTasks:p.importTaskManifest?.filter(row=>row.sourceVerification==='pending').length??0};
     result.assets=[];const cursor=tx.objectStore('photoAssets').index('projectId').openCursor(IDBKeyRange.only(p.id));
     cursor.onsuccess=()=>{const c=cursor.result;if(!c)return;const a=c.value;result.assets.push({id:a.id,path:a.sourcePath,
      sha:a.sourceFullSha256,revision:a.sourceContentRevision,token:a.sourceFileToken});c.continue();};
@@ -134,6 +137,61 @@ try{
   });}finally{socket.close();}
  }
 
+ if(process.env.OMC_R21_INCREMENTAL==='1'){
+  report.incrementalCommitBoundaries=[];
+  for(const mode of ['cancel-before','force-before','force-after']){
+   if(mode!=='cancel-before'){
+    profile=path.join(work,'profile-'+mode);await startApp();
+    await until('[...document.querySelectorAll("button")].some(e=>e.offsetWidth&&e.innerText.trim()==="使用此编号开始选片")');await click('使用此编号开始选片');
+    if(await ev('Boolean(document.querySelector("button[aria-label=跳过新手引导]"))'))await click('跳过新手引导');
+   }
+   report.stage='incremental-'+mode;
+   assert(await ev(`(async()=>{
+    const {db}=await import('/src/store/db.js');
+    const actual=db.commitIncrementalJpegBatch.bind(db),state={entered:false,used:false,applied:false};
+    window.__OMC_INCREMENTAL_PAUSE__=state;
+    db.commitIncrementalJpegBatch=async(...args)=>{
+     if(state.used)return actual(...args);state.used=true;
+     const pause=()=>new Promise(resolve=>{state.release=resolve;state.entered=true;});
+     if(${JSON.stringify(mode)}==='force-after'){
+      const result=await actual(...args);state.applied=result.applied;await pause();return result;
+     }
+     await pause();return actual(...args);
+    };return true;
+   })()`),'REAL_COMMIT_PAUSE_INSTALLED');
+   await click('导入照片');assert(await installCloudImportPicker(work,files.slice(0,32),1000),'BOUNDARY_PICKER');await click('选择文件');
+   await until('Boolean(window.__OMC_INCREMENTAL_PAUSE__?.entered)',120000);
+   const staged=await snapshot(),expectedAssets=mode==='force-after'?12:0;
+   assert(staged.project?.manifestVersion===2&&staged.project.count===expectedAssets&&staged.assets.length===expectedAssets
+    &&staged.project.verifiedTasks===expectedAssets&&staged.project.pendingTasks===32-expectedAssets,'ATOMIC_BATCH_BOUNDARY');
+   const prior=new Map(staged.assets.map(a=>[a.path,a]));
+   const result={mode,controlledDelayOfActualCommit:true,before:staged.project,assetCount:staged.assets.length};
+   if(mode==='cancel-before'){
+    await click('取消导入');await ev('(()=>{window.__OMC_INCREMENTAL_PAUSE__.release();return true})()');
+    await until('Boolean(document.querySelector(".import-cancel-notice"))',30000);
+    result.cancelNotice=await ev('document.querySelector(".import-cancel-notice").innerText');
+    await click('关闭');
+   }else{result.processExit=await stopApp(true);await startApp();}
+   const retained=await waitSnapshot(v=>v.project?.id===staged.project.id&&v.project.importState==='interrupted','BOUNDARY_PLAN_NOT_RETAINED');
+   assert(retained.assets.length===expectedAssets&&retained.decisions.length===0,'BOUNDARY_PARTIAL_OR_INVENTED_RECORD');
+   result.afterInterruption=retained.project;
+   await click('项目');await until('document.querySelectorAll(".project-card-menu-button").length===1');
+   await ev('(()=>{document.querySelector(".project-card-menu-button").click();return true})()');
+   assert(await mainDirectoryPicker(stressDir),'BOUNDARY_DIRECTORY_ADAPTER');await click('核验原片并补全导入');
+   const completed=await waitSnapshot(v=>v.project?.id===staged.project.id&&v.project.importState==='complete','BOUNDARY_RECOVERY_NOT_COMPLETE',180000);
+   assert(completed.assets.length===32&&completed.project.count===32&&completed.project.pendingTasks===0
+    &&completed.project.verifiedTasks===32&&completed.decisions.length===0,'BOUNDARY_RECOVERY_ACCOUNTING');
+   for(const [p,old] of prior){const current=completed.assets.find(a=>a.path===p);
+    assert(current&&current.id===old.id&&current.sha===old.sha&&current.revision===old.revision,'BOUNDARY_EXISTING_IDENTITY_CHANGED');}
+   await until('!document.querySelector(".project-card[aria-busy=true]")&&Boolean(document.querySelector(".project-drawer-close:not(:disabled)"))',30000);
+   result.recovered=completed.project;result.existingIdentitiesPreserved=prior.size;
+   result.visibleWithoutRestart=mode==='cancel-before';report.incrementalCommitBoundaries.push(result);
+   await stopApp(false);
+  }
+  profile=path.join(work,'profile-mixed');await startApp();
+  await until('[...document.querySelectorAll("button")].some(e=>e.offsetWidth&&e.innerText.trim()==="使用此编号开始选片")');await click('使用此编号开始选片');
+  if(await ev('Boolean(document.querySelector("button[aria-label=跳过新手引导]"))'))await click('跳过新手引导');
+ }
  if(process.env.OMC_R20_RECOVERY_UI_ONLY!=='1'){
  report.stage='mixed-valid-and-damaged-import';
  const damaged=path.join(stressDir,'damaged.jpg');fs.writeFileSync(damaged,Buffer.from([255,216,255,224,0,16,74,70,73,70]));
@@ -166,7 +224,14 @@ try{
  }
  report.stage='interrupt-import';
  await click('导入照片');assert(await installCloudImportPicker(work,files,1000),'RECOVERY_PICKER');await click('选择文件');
- await waitSnapshot(v=>v.project?.importState==='importing'&&v.project.count>=12,'FIRST_DURABLE_BATCH',180000);
+ const importStarted=Date.now();
+ const firstWave=await waitSnapshot(v=>v.project?.importState==='importing'&&v.project.count>=12,'FIRST_DURABLE_BATCH',180000);
+ if(process.env.OMC_R21_INCREMENTAL==='1'){
+  assert(firstWave.project.manifestVersion===2&&firstWave.project.pendingTasks>0
+   &&firstWave.project.verifiedTasks===firstWave.assets.length,'FIRST_WAVE_WAITED_FOR_ALL_FULL_HASHES');
+  report.firstWave={...firstWave.project,assets:firstWave.assets.length,observedElapsedMs:Date.now()-importStarted,
+   inputSelectionMetadataWasAlreadyRead:true};
+ }
  const before=await markHumanKeep();
  assert(before.project.count<recoveryCount&&before.project.importState==='importing','IMPORT_FINISHED_BEFORE_INTERRUPTION');
  report.interruption={project:before.project,assetCount:before.assets.length,
@@ -192,7 +257,7 @@ try{
  report.recovered={project:recovered.project,assets:recovered.assets.length,preexistingIdentitiesPreserved:restoredBefore.size,
    humanDecisionPreserved:true,resumeElapsedMs:Date.now()-resumeStart,rendererJsHeap:heap};
 
- if(process.env.OMC_R20_RECOVERY_UI_ONLY==='1'){
+ if(process.env.OMC_R20_RECOVERY_UI_ONLY==='1'||process.env.OMC_R21_INCREMENTAL==='1'){
   report.stage='actual-ui-after-recovery-commit';const uiStart=Date.now();
   await until('!document.querySelector(".project-card[aria-busy=true]")&&Boolean(document.querySelector(".project-drawer-close:not(:disabled)"))',30000);
   await click('关闭项目抽屉');await until('!document.querySelector(".project-drawer-close")');
@@ -211,7 +276,7 @@ try{
  }
  report.allSyntheticSourcesUnchanged=mothers.every(file=>hash(fs.readFileSync(file))===sourceHashes.get(file));
  assert(report.allSyntheticSourcesUnchanged,'SYNTHETIC_ORIGINAL_BYTES_CHANGED');
- await snap('photo-grid');report.status=process.env.OMC_R20_RECOVERY_UI_ONLY==='1'?'PASS_SOURCE_RECOVERY_UI_CONTINUATION_128_PATHS':'PASS_SOURCE_MIXED_IMPORT_AND_INTERRUPTED_1000_PATH_RECOVERY';report.stage='done';
+ await snap('photo-grid');report.status=process.env.OMC_R21_INCREMENTAL==='1'?'PASS_INCREMENTAL_JPEG_FIRST_WAVE_AND_COMMIT_RECOVERY':process.env.OMC_R20_RECOVERY_UI_ONLY==='1'?'PASS_SOURCE_RECOVERY_UI_CONTINUATION_128_PATHS':'PASS_SOURCE_MIXED_IMPORT_AND_INTERRUPTED_1000_PATH_RECOVERY';report.stage='done';
  report.limitations=['Source development entry, not installed package or complete AI','16 synthetic pixel sources over 1000 hardlinked paths; not 1000 independent real photos',
   'Native import/recovery picker UI answers adapted; all file grants, hashes, decodes, DB writes and recovery transactions are production paths',
   'Forced exit targets only this disposable Windows QA application; user computer untouched','Renderer JS heap is not total process/native memory'];

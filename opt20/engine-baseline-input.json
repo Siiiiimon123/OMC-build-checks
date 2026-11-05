@@ -1,11 +1,10 @@
 {
-  "sourceTree": "e596b41d17551e3f2bdba088cc9105fe99d1fcaa",
-  "sourceFiles": 933,
-  "sourcePathSha256Digest": "291503d973596147e1567d644eb444412e6e264e40c94c2faeae75c5d10b2efe",
-  "engineInstallerVersion": "1.0.21-preview.19",
-  "engineInstallerSha256": "daade4392f5b77262fbd1f53b4ffbcb89e73290952f1a0779739c0ff8d97eb27",
-  "actualModelHashes": "collected from the authenticated immutable payload in cloud",
+  "sourceTree": "c402690cf15b9565c37e83751917e03460ee182b",
+  "sourceFiles": 935,
+  "sourcePathSha256Digest": "2cc60a23e7a75b2a0e0dbd72b15b7151940103c69a3b2329b4cefe1736572c16",
   "currentProductQualified": false,
   "realPhotos": false,
-  "memberData": false
+  "memberData": false,
+  "sourceArchiveIncludesModelsOrRuntime": false,
+  "installedPackageTested": false
 }
