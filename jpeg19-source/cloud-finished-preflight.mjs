@@ -27,7 +27,8 @@ for(const match of text.matchAll(/(?:ev|until)\((('(?:\\.|[^'\\])*')|("(?:\\.|[^
 }
 assert(parsed>=15);
 const clickLine=text.split(/\r?\n/).find(x=>x.startsWith('async function click(text)'));
-const click=new vm.Script('('+clickLine+')').runInNewContext({assert:(v,m)=>assert(v,m),ev:async expression=>{new vm.Script('(async()=>('+expression+'))()');return true;}});
+let readyObserved=false;
+const click=new vm.Script('('+clickLine+')').runInNewContext({assert:(v,m)=>assert(v,m),until:async expression=>{new vm.Script('(async()=>('+expression+'))()');readyObserved=true;},ev:async expression=>{assert(readyObserved,'Clicks must wait for enabled controls');new vm.Script('(async()=>('+expression+'))()');return true;}});
 await click('cloud "quoted" label');
 const dialog={};
 const installer=new vm.Script('('+installExportPicker.toString()+')').runInNewContext({process:{mainModule:{require:name=>{assert.equal(name,'electron');return{dialog};}}}});
