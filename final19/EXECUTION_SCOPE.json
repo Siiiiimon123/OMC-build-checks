@@ -14,7 +14,7 @@
   "automaticRerun": false,
   "stopRepeatingSuccessfulStage": true,
   "executed": {
-    "windows": 9,
+    "windows": 10,
     "mac": 2
   },
   "sameApprovedTwoPhotosOnly": true,
@@ -27,11 +27,11 @@
     "platforms": [
       "windows"
     ],
-    "windowsAttempt": 10,
+    "windowsAttempt": 11,
     "mode": "ACCEPT_EXISTING_FROZEN_INSTALLER_NO_BUILD",
     "artifact": 13402959173,
     "sha256": "daade4392f5b77262fbd1f53b4ffbcb89e73290952f1a0779739c0ff8d97eb27",
-    "reason": "Actual run42006404732 first installation and every payload file hash passed; QA desktop scan encountered unrelated link with empty target. Exclude only empty targets while preserving exact one OMC shortcut requirement.",
+    "reason": "Read run42007557211: installed payload passes but no matching desktop target. Collect full link inventory, retain release blocker, independently run installed complete AI and JPEG/group/export rather than suppressing them.",
     "approval": "User same-scope free continuation, no repeated questions",
     "macRebuilt": false
   },

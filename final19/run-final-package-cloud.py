@@ -186,7 +186,11 @@ def main():
             run('first-install-windows', ['powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass',
                 '-File', inputs / 'Install-FinalWindows.ps1', '-InputsPath', package_inputs,
                 '-OutputPath', evidence / 'FIRST_INSTALL.json'], timeout=600)
-            installed = json.loads((evidence / 'FIRST_INSTALL.json').read_text(encoding='utf-8-sig'))['executable']
+            installation = json.loads((evidence / 'FIRST_INSTALL.json').read_text(encoding='utf-8-sig'))
+            assert installation['installedPayloadPassed'] is True
+            installed = installation['executable']
+            result['firstInstallPayloadPassed'] = True
+            result['shortcutBindingPassed'] = installation['shortcutBindingPassed']
         elif sys.platform == 'win32':
             # A new build alone requires model transport; acceptance reuses the frozen installer.
             fetch_exact('fetch-existing-model-transport', HERE / 'RESOURCE_TRANSPORT.json', 'base', WORK / 'base.tar')
@@ -233,6 +237,9 @@ def main():
         result.update(status='PASS_FINAL_PACKAGE_FIRST_INSTALL_FULL_AI_JPEG_GROUP_EXPORT',
             package={'bytes': package.stat().st_size, 'sha256': sha(package), 'name': package.name},
             firstInstallPassed=True, fullAiFunctionalPassed=True, installedRealJpegPassed=True)
+        if acceptance_only and result['shortcutBindingPassed'] is not True:
+            result['firstInstallPassed'] = False
+            raise AssertionError('WINDOWS_DESKTOP_SHORTCUT_BINDING_NOT_VERIFIED')
         success = True
     except Exception as exc:
         result.update(status='FAIL', error=type(exc).__name__ + ': ' + str(exc))
