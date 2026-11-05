@@ -89,6 +89,23 @@ try:
     npm='npm.cmd' if os.name=='nt' else 'npm'
     if not stage('dependencies',[npm,'ci','--ignore-scripts','--no-audit','--no-fund'],source,timeout=420):
         raise RuntimeError('DEPENDENCY_PREPARATION_FAILED')
+    if os.environ.get('OMC_R20_RECOVERY_ONLY')=='1':
+        checks=[stage('import-recovery-contracts',['node','--test','src/services/projectImportState.test.js',
+            'src/services/partialImportState.test.js','src/services/photoSourceRecovery.test.js',
+            'src/services/importRecoveryContract.test.js','src/services/importFailureRecovery.test.js'],source)]
+        checks.append(stage('build',[npm,'run','build'],source))
+        previous=source/'preview-manifest.json'
+        if previous.exists():
+            previous.rename(REPORTS/'previous-preview-manifest.json')
+        checks.append(stage('prepare-preview',['node','scripts/startBrowserPreview.mjs','--prepare'],source))
+        child_env.pop('ELECTRON_SKIP_BINARY_DOWNLOAD',None)
+        checks.append(stage('electron-runtime',['node','node_modules/electron/install.js'],source,timeout=300))
+        if all(checks):
+            case=REPORTS/'native-recovery';case.mkdir()
+            child_env['OMC_R20_VIEWPORT']='compact'
+            checks.append(stage('native-mixed-and-interrupted-recovery',['node',str(HERE/'cloud-recovery-run.mjs'),str(source),str(case)],source,timeout=1200))
+        ok=all(checks)
+        raise SystemExit(0 if ok else 1)
     targeted=['src/services/analysisPerformance.test.js','src/services/conservativeAutomaticReview.test.js',
         'src/services/automaticReviewStripStats.test.js','src/services/automaticAdjustmentPreview.test.js',
         'src/services/jpegPreviewRenderer.test.js','src/workers/jpegAdjustmentPreview.worker.test.js',
