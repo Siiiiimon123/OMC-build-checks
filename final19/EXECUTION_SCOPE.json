@@ -14,7 +14,7 @@
   "automaticRerun": false,
   "stopRepeatingSuccessfulStage": true,
   "executed": {
-    "windows": 4,
+    "windows": 5,
     "mac": 2
   },
   "sameApprovedTwoPhotosOnly": true,
@@ -27,8 +27,8 @@
     "platforms": [
       "windows"
     ],
-    "windowsAttempt": 5,
-    "reason": "Compile actual source bytes directly; no encoding alias conversion",
+    "windowsAttempt": 6,
+    "reason": "After verified compilation, unlink only temporary compiler input links and keep original runtime single-link files",
     "macBuildStoppedAfterSuccess": true
   },
   "windowsSingleSupplement": {

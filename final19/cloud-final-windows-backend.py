@@ -260,7 +260,8 @@ def main():
             target.parent.mkdir(parents=True, exist_ok=True)
             os.link(by_content[expected], target)
             assert (target.stat().st_size, sha(target)) == expected
-            linked.append(row['path'])
+            linked.append({'target': str(target), 'keeper': str(by_content[expected]),
+                           'size': row['size'], 'sha256': row['sha256']})
         else:
             missing.append((target, row))
     with tarfile.open(args.resource_tar, 'r:') as archive:
@@ -345,6 +346,22 @@ def main():
         os.replace(temporary, target)
     actual = inventory(runtime)
     assert actual == desired
+    # Compiler-only input links must not survive into the member runtime.
+    # Keep its original files and all release checks; no model copy is needed.
+    released_links = []
+    for link in linked:
+        target, keeper = Path(link['target']), Path(link['keeper'])
+        assert target.resolve().is_relative_to(source) and keeper.resolve().is_relative_to(runtime)
+        assert not target.is_symlink() and not keeper.is_symlink() and os.path.samefile(target, keeper)
+        assert target.stat().st_size == link['size'] and sha(target) == link['sha256']
+        target.unlink()
+        released_links.append({'compilerInput': str(target.relative_to(source)),
+                               'runtimeKeeper': str(keeper.relative_to(runtime)),
+                               'sha256': link['sha256']})
+    assert inventory(runtime) == desired
+    assert all((runtime / name).stat().st_nlink == 1 for name in actual), 'RUNTIME_INPUT_LINKS_STILL_PRESENT'
+    save(reports / 'BACKEND_COMPILER_LINK_RELEASE.json', {'status': 'PASS',
+        'released': released_links, 'runtimeBytesUnchanged': True, 'runtimeSingleLinksVerified': True})
     evidence = load(runtime / 'build-evidence.json')
     evidence.update(built_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),
         input_manifest_sha256=NEW_INPUT_SHA, runtime_tree_sha256=tree(actual), runtime_file_count=len(actual),
