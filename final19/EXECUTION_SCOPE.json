@@ -1,0 +1,26 @@
+{
+  "schema": "omc-final-package19-bounded-execution-v1",
+  "baselineSourceTree": "1e39b9ae2921480b27d4a1a8bf5f8499004886fa",
+  "cloudDispatchApproved": true,
+  "approvalEvidence": "call_798509f8b9cb41509c787f2df6566a25",
+  "repository": "Siiiiimon123/OMC-build-checks",
+  "branch": "verify-final-package19",
+  "limits": {
+    "windowsMaxRuns": 3,
+    "macMaxRuns": 3,
+    "minutesEach": 90
+  },
+  "feeUSD": 0,
+  "automaticRerun": false,
+  "stopRepeatingSuccessfulStage": true,
+  "executed": {
+    "windows": 0,
+    "mac": 0
+  },
+  "sameApprovedTwoPhotosOnly": true,
+  "plaintextProductSourceModelsPhotosKeysPublic": false,
+  "productionUpgradeRequiresUnblockedTrustedFeed": true,
+  "noNewPaidServicesOrSettings": true,
+  "mainChanged": false,
+  "verbatim": "\u5141\u8bb8\u6309\u6b64\u8303\u56f4\u5b8c\u6210\u6700\u7ec8\u4e91\u9a8c\u6536"
+}

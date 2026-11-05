@@ -1,0 +1,32 @@
+{
+  "schema": "omc-aes256gcm-build-transport-v1",
+  "assets": [
+    {
+      "id": "reports",
+      "plaintextBytes": 952320,
+      "plaintextSha256": "7636257b3f9411cb4cda84125db8306121bde50e1e8ea844e08dd395c2fb88ba",
+      "ciphertextBytes": 952320,
+      "nonceHex": "203301d5c6f72f641779db52",
+      "ciphertextSha256": "73a6d595002d180a03b03b4ee689f830287e8b034603a7ba6af161d1ba650bf1",
+      "tagHex": "d2288f79acaa46dfa20033a54b276f2e",
+      "url": "https://github.com/Siiiiimon123/OMC-build-checks/releases/download/omc-windows-r1-encrypted-result-41584895765/reports.enc"
+    },
+    {
+      "id": "pkg",
+      "plaintextBytes": 827849039,
+      "plaintextSha256": "d59c5e92eea29251702c8e06038e616e78e10604f6863f39309af932a543c8fd",
+      "ciphertextBytes": 827849039,
+      "nonceHex": "99b38fd55885884a96c63ed0",
+      "ciphertextSha256": "78efb665652cb127cbafba4ba8ee274f103a6b579826b7b71f8b676c11493d6c",
+      "tagHex": "db5de5539cd80dc5add41c81891aefcb",
+      "url": "https://github.com/Siiiiimon123/OMC-build-checks/releases/download/omc-windows-r1-encrypted-result-41584895765/package.enc"
+    }
+  ],
+  "sourceTree": "cb0aaee04d7a99e4b175e2b8b039a23afec85006",
+  "runId": "41584895765",
+  "buildExitCode": 0,
+  "memberCatalogChanged": false,
+  "wizardClicksTested": false,
+  "bareWindowsQualified": false,
+  "inAppTufUpdateTested": false
+}

@@ -1,0 +1,15 @@
+{
+  "schema": "omc-aes256gcm-build-transport-v1",
+  "assets": [
+    {
+      "id": "base",
+      "plaintextBytes": 1061386240,
+      "plaintextSha256": "9d75619194c66d1c6bbaeb5d7e63ad4b09b54605f99f7230289ab6f60378cc1a",
+      "ciphertextBytes": 1061386240,
+      "nonceHex": "7f467bc622231f439e29f293",
+      "ciphertextSha256": "b61fd7f7cec7f6a0253beee47ed7f25eb8c8893580eecd76ee6db86ddf13541d",
+      "tagHex": "faef955f9fb75ce95ae22eb88037efc6",
+      "url": "https://github.com/Siiiiimon123/OMC-build-checks/releases/download/omc-preview15-encrypted-build-20261031/base.enc"
+    }
+  ]
+}
