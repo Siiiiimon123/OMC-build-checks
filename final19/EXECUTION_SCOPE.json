@@ -14,7 +14,7 @@
   "automaticRerun": false,
   "stopRepeatingSuccessfulStage": true,
   "executed": {
-    "windows": 1,
+    "windows": 2,
     "mac": 2
   },
   "sameApprovedTwoPhotosOnly": true,
@@ -27,8 +27,8 @@
     "platforms": [
       "windows"
     ],
-    "windowsAttempt": 2,
-    "macSecondRunContinues": true,
-    "reason": "Actual compiled EXE exists in no-COLLECT workpath, not dist; compiler itself succeeded"
+    "windowsAttempt": 3,
+    "macBuildStoppedAfterSuccess": true,
+    "reason": "Read actual closure; exclude host DLL drift with real native/Python/stdlib identity proof and original-runtime byte retention"
   }
 }
