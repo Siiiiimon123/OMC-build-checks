@@ -70,6 +70,8 @@ try{
  let target;for(let n=0;n<200;n++){try{const port=Number(fs.readFileSync(path.join(profile,'DevToolsActivePort'),'utf8').split('\n')[0]);target=(await(await fetch('http://127.0.0.1:'+port+'/json/list')).json()).find(p=>p.type==='page'&&p.url.startsWith('http://localhost:5173'));if(target)break;}catch{}await delay(250);}check(target,'SOURCE_RENDERER_NOT_READY');
  ws=new WebSocket(target.webSocketDebuggerUrl);await new Promise((r,j)=>{const t=setTimeout(()=>j(Error('CDP_OPEN')),10000);ws.addEventListener('open',()=>{clearTimeout(t);r();},{once:true});ws.addEventListener('error',()=>{clearTimeout(t);j(Error('CDP_OPEN'));},{once:true});});
  ws.addEventListener('message',e=>{const m=JSON.parse(e.data),p=pending.get(m.id);if(p){pending.delete(m.id);clearTimeout(p.t);m.error?p.reject(Error(JSON.stringify(m.error))):p.resolve(m.result);}});await call('Runtime.enable');
+ let rendererReady=false;for(let n=0;n<120;n++){try{const state=await evaluate(`({origin:location.origin,ready:document.readyState,root:document.getElementById('root')?.childElementCount??0})`);if(state.origin==='http://localhost:5173'&&state.ready!=='loading'&&state.root>0){rendererReady=true;break;}}catch{}await delay(250);}check(rendererReady,'SOURCE_DOCUMENT_NOT_READY');
+
  for(const f of fixtures.files.filter(f=>f.file.endsWith('-overview.jpg'))){
   if(bodyProbe){
    if(productWorkerProbe && f.file.endsWith('-overview.jpg')) {
