@@ -1,0 +1,14 @@
+{
+  "schema": "omc-aes256gcm-build-transport-v1",
+  "assets": [
+    {
+      "id": "mac-policy-source",
+      "plaintextBytes": 71303,
+      "plaintextSha256": "56f0c111b8ea136ee046efa5e059e95804cac64e4c109451abda92e066e539ce",
+      "ciphertextBytes": 71303,
+      "nonceHex": "2f7c791a54b081cee0d784f6",
+      "ciphertextSha256": "86f79aa1e96332e31da9ea589f0d5003fca8e37d845cc8cd3bf0d0a37e374c51",
+      "tagHex": "5745de32f031c4e1e0b7455373d28dff"
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-name: Frozen Mac21 same-machine provider latency diagnostic
+name: Mac adaptive runtime source candidate and exact model checks
 'on':
   push:
     branches: ['verify-optimization20']
@@ -18,19 +18,19 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
         with: {python-version: '3.12.10', architecture: arm64, check-latest: false}
       - name: Parse the bounded diagnostic before download
-        run: python -c "import ast,pathlib; [ast.parse(pathlib.Path('final21',p).read_text(encoding='utf8')) for p in ['mac-provider-probe.py','run-mac-provider-probe.py']]"
+        run: python -c "import ast,pathlib; [ast.parse(pathlib.Path('final21',p).read_text(encoding='utf8')) for p in ['cloud-mac-policy-probe.py','run-mac-policy-probe.py']]"
       - name: Compare fixed models without changing product
         env:
           OMC_PREVIEW15_TRANSPORT_KEY: '${{ secrets.OMC_PREVIEW15_TRANSPORT_KEY }}'
           GH_TOKEN: '${{ github.token }}'
           PYTHONDONTWRITEBYTECODE: '1'
-        run: python final21/run-mac-provider-probe.py
+        run: python final21/run-mac-policy-probe.py
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         if: always()
         with:
-          name: mac21-provider-diagnostic-encrypted-evidence
+          name: mac-policy-source-encrypted-evidence
           path: |
-            ${{ runner.temp }}/omc-provider21/encrypted/reports.enc
-            ${{ runner.temp }}/omc-provider21/encrypted/REPORTS_READY.json
+            ${{ runner.temp }}/omc-policy21/encrypted/reports.enc
+            ${{ runner.temp }}/omc-policy21/encrypted/REPORTS_READY.json
           retention-days: 7
           if-no-files-found: warn
