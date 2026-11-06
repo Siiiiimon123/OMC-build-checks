@@ -22,7 +22,7 @@ async function until(expression,ms=120000){const end=Date.now()+ms;while(Date.no
 async function click(text){await until(`([...document.querySelectorAll('button')].some(e=>e.offsetWidth&&!e.disabled&&(e.getAttribute('aria-label')===${JSON.stringify(text)}||e.innerText.trim()===${JSON.stringify(text)})))`,30000);assert(await ev(`(()=>{const e=[...document.querySelectorAll('button')].find(e=>e.offsetWidth&&!e.disabled&&(e.getAttribute('aria-label')===${JSON.stringify(text)}||e.innerText.trim()===${JSON.stringify(text)}));if(!e)return false;e.click();return true})()`),'BUTTON:'+text);}
 async function snap(name){const r=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});fs.writeFileSync(path.join(out,name+'.png'),Buffer.from(r.data,'base64'));}
 try{
- const expectedBranch='refs/heads/verify-final-package19';
+ const expectedBranch='refs/heads/verify-optimization20';
  assert(['win32','darwin'].includes(process.platform)&&process.env.GITHUB_ACTIONS==='true'&&process.env.GITHUB_REPOSITORY==='Siiiiimon123/OMC-build-checks'&&process.env.GITHUB_REF===expectedBranch,'CLOUD_SCOPE');
  let fixture=providedFixture,width=null,height=null,nearFixture=null;
  if(!fixture){width=8192;height=5464;const rgba=Buffer.alloc(width*height*4);

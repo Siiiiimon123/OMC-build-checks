@@ -8,7 +8,7 @@ const {execFileSync} = require('node:child_process');
 const {createRequire} = require('node:module');
 const C = require('./contracts.cjs');
 const bootstrap = require('./bootstrap.cjs');
-const SOURCE_TREE = '1e39b9ae2921480b27d4a1a8bf5f8499004886fa';
+const SOURCE_TREE = '31b79bac263eef3e2c32e9fabe8537f8d77401be';
 const BASE = {bytes:827849039,sha256:'d59c5e92eea29251702c8e06038e616e78e10604f6863f39309af932a543c8fd'};
 const read = file => JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, ''));
 const save = (file, value) => fs.writeFileSync(file, JSON.stringify(value, null, 2)+'\n', {flag:'wx'});
@@ -30,7 +30,7 @@ function members(raw) {
 
 async function main() {
   assert(process.env.GITHUB_ACTIONS==='true' && process.env.GITHUB_REPOSITORY==='Siiiiimon123/OMC-build-checks');
-  assert(process.env.GITHUB_RUN_ATTEMPT==='1' && process.env.GITHUB_REF==='refs/heads/verify-final-package19');
+  assert(process.env.GITHUB_RUN_ATTEMPT==='1' && process.env.GITHUB_REF==='refs/heads/verify-optimization20');
   assert(process.platform==='win32' && process.arch==='x64');
   const args = process.argv.slice(2);
   assert(args.length===12, 'SIX_EXACT_ARGUMENT_PAIRS');
@@ -41,7 +41,7 @@ async function main() {
   const inputs = C.beneath(temp,o.inputs), resources=C.beneath(temp,o.resources);
   assert(!fs.existsSync(work), 'FRESH_WORK_REQUIRED');
   const manifest=read(path.join(inputs,'source19-records.json'));
-  assert(manifest.sourceTree===SOURCE_TREE && manifest.records.length===932);
+  assert(manifest.sourceTree===SOURCE_TREE && manifest.records.length===935);
   await C.verifyRows(source,manifest.records);
   assert.equal(C.gitTree(manifest.records),SOURCE_TREE);
   await C.verifyRows(temp,[{path:path.relative(temp,base).replaceAll('\\','/'),...BASE}]);
@@ -53,7 +53,7 @@ async function main() {
   fs.mkdirSync(work);
   const reports=path.join(work,'reports');fs.mkdirSync(reports);
   const result={schema:'omc-final-windows-build-v1',status:'RUNNING',baselineSourceTree:SOURCE_TREE,
-    version:'1.0.21-preview.19',releaseAccepted:false,installerExecuted:false,fullAiAccepted:false};
+    version:'1.0.21-preview.20',releaseAccepted:false,installerExecuted:false,fullAiAccepted:false};
   const env={...process.env};
   for (const name of ['OMC_PREVIEW15_TRANSPORT_KEY','GITHUB_TOKEN','GH_TOKEN']) delete env[name];
   const command=(label,exe,argv,options={})=>{

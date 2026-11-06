@@ -1,40 +1,54 @@
-name: R31 displayed JPEG save readiness and group export
+name: Current Preview20 native packaging and installed full-AI acceptance
 'on':
   push:
     branches: ['verify-optimization20']
-    paths: ['.github/workflows/optimization20.yml', 'opt20/**']
+    paths: ['.github/workflows/optimization20.yml', 'final19/**', 'opt20/**']
 permissions: {contents: read, actions: read}
-concurrency: {group: omc-optimization20-timing, cancel-in-progress: false}
 jobs:
-  regression:
-    if: github.repository == 'Siiiiimon123/OMC-build-checks' && github.run_attempt == 1
+  native:
+    if: github.repository == 'Siiiiimon123/OMC-build-checks' && github.event.repository.private == false && github.run_attempt == 1
     strategy:
       fail-fast: false
       matrix:
         include:
-          - {os: windows-2025, arch: x64}
-          - {os: macos-15, arch: arm64}
+          - {os: windows-2025, arch: x64, python: '3.14.5'}
+          - {os: macos-15, arch: arm64, python: '3.12.10'}
+    concurrency: {group: 'omc-final-package20-${{ matrix.os }}', cancel-in-progress: false}
     runs-on: '${{ matrix.os }}'
-    timeout-minutes: 20
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with: {persist-credentials: false, fetch-depth: 1}
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with: {node-version: '24.19.0', architecture: '${{ matrix.arch }}', check-latest: false, package-manager-cache: false}
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
-        with: {python-version: '3.12.10', architecture: '${{ matrix.arch }}', check-latest: false}
-      - name: Frozen source and authorized JPEG GUI gap only
+        with: {python-version: '${{ matrix.python }}', architecture: '${{ matrix.arch }}', check-latest: false}
+      - name: Validate controller syntax before dependency downloads
+        run: python final19/run-final-package-cloud.py --preflight
+      - name: Build current source, install and exercise full AI with the approved two photos
         env:
           OMC_PREVIEW15_TRANSPORT_KEY: '${{ secrets.OMC_PREVIEW15_TRANSPORT_KEY }}'
           PYTHONDONTWRITEBYTECODE: '1'
-          OMC_JPEG_RACE_REPAIR_ONLY: '1'
-        run: python opt20/run-jpeg-timing.py
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          OMC_ACCEPT_EXISTING_WINDOWS: '0'
+          OMC_SHORTCUT_LAUNCH_ONLY: '0'
+          GH_TOKEN: '${{ github.token }}'
+        run: python final19/run-final-package-cloud.py
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         if: always()
         with:
-          name: 'optimization20-${{ matrix.os }}-encrypted-evidence'
+          name: 'final20-${{ matrix.os }}-encrypted-evidence'
           path: |
-            ${{ runner.temp }}/omc-optimization-r20/encrypted/reports.enc
-            ${{ runner.temp }}/omc-optimization-r20/encrypted/REPORTS_READY.json
+            ${{ runner.temp }}/omc-final-package20/encrypted/reports.enc
+            ${{ runner.temp }}/omc-final-package20/encrypted/REPORTS_READY.json
+          retention-days: 7
+          if-no-files-found: warn
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        if: always()
+        with:
+          name: 'final20-${{ matrix.os }}-encrypted-package'
+          path: |
+            ${{ runner.temp }}/omc-final-package20/encrypted/package.enc
+            ${{ runner.temp }}/omc-final-package20/encrypted/PACKAGE_READY.json
           retention-days: 7
           if-no-files-found: warn

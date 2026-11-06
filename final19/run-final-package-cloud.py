@@ -14,11 +14,12 @@ import sys
 import traceback
 import zipfile
 import ast
+import base64
 import time
 
 HERE = Path(__file__).resolve().parent
-WORK = Path(os.environ['RUNNER_TEMP']).resolve() / 'omc-final-package19'
-SOURCE_TREE = '1e39b9ae2921480b27d4a1a8bf5f8499004886fa'
+WORK = Path(os.environ['RUNNER_TEMP']).resolve() / 'omc-final-package20'
+SOURCE_TREE = '31b79bac263eef3e2c32e9fabe8537f8d77401be'
 
 
 def sha(file):
@@ -60,7 +61,7 @@ def unzip(archive, root, records=None, limit=16 * 1024**2):
 def main():
     assert os.environ.get('GITHUB_ACTIONS') == 'true'
     assert os.environ.get('GITHUB_REPOSITORY') == 'Siiiiimon123/OMC-build-checks'
-    assert os.environ.get('GITHUB_REF') == 'refs/heads/verify-final-package19'
+    assert os.environ.get('GITHUB_REF') == 'refs/heads/verify-optimization20'
     assert os.environ.get('GITHUB_RUN_ATTEMPT') == '1'
     assert sys.platform in ('win32', 'darwin') and not WORK.exists()
     assert shutil.disk_usage(WORK.parent).free > 14 * 1024**3
@@ -113,7 +114,7 @@ def main():
     success = False
     try:
         scope = json.loads((HERE / 'EXECUTION_SCOPE.json').read_bytes())
-        assert scope['schema'] == 'omc-final-package19-bounded-execution-v1'
+        assert scope['schema'] == 'omc-current-package20-bounded-execution-v1'
         assert scope['cloudDispatchApproved'] is True and scope['feeUSD'] == 0
         assert scope['baselineSourceTree'] == SOURCE_TREE and scope['automaticRerun'] is False
         assert scope['limits']['windowsMaxRuns'] <= 3 and scope['limits']['macMaxRuns'] <= 3
@@ -122,6 +123,8 @@ def main():
         prior = HERE.parent / 'jpeg19-source'
         cfg = json.loads((prior / 'INPUT.json').read_bytes())
         for asset in cfg['assets']:
+            if not asset['id'].startswith('sample-'):
+                continue
             target, meta = WORK / (asset['id'] + '.enc'), WORK / (asset['id'] + '.transport.json')
             parts = sorted((prior / 'inputs' / asset['id']).glob('*.enc'))
             assert len(parts) == (asset['ciphertextBytes'] + 65535) // 65536
@@ -135,16 +138,48 @@ def main():
             dest = WORK / (asset['id'] + ('.jpg' if asset['id'].startswith('sample-') else '.plain'))
             run('decrypt-' + asset['id'], ['node', transport, 'decrypt', '--manifest', meta,
                 '--id', asset['id'], '--input', target, '--output', dest], timeout=120, private=True)
-        records = json.loads((WORK / 'source19-records.plain').read_bytes())
-        assert records['sourceTree'] == SOURCE_TREE and len(records['records']) == 932
+        current = HERE.parent / 'opt20'
+        cipher = WORK / 'current-source.enc'
+        with cipher.open('xb') as writer:
+            for index in range(14):
+                writer.write((current/('source.part%02d.enc'%index)).read_bytes())
+        run('decrypt-current-base-source',['node',transport,'decrypt','--manifest',current/'source.transport.json',
+            '--id','source-r20','--input',cipher,'--output',WORK/'current-source.zip'],private=True)
         source = WORK / 'source'
-        unzip(WORK / 'source19.plain', source, records['records'])
+        unzip(WORK/'current-source.zip',source)
+        cipher = WORK/'current-overlay.enc'
+        cipher.write_bytes(base64.b64decode((current/'overlay.b64').read_bytes(),validate=True))
+        run('decrypt-current-source-overlay',['node',transport,'decrypt','--manifest',current/'overlay.transport.json',
+            '--id','r20-overlay','--input',cipher,'--output',WORK/'current-overlay.zip'],private=True)
+        with zipfile.ZipFile(WORK/'current-overlay.zip') as archive:
+            patch=json.loads(archive.read('PATCH.json'))
+            assert len(patch)==32 and {i.filename for i in archive.infolist()}=={'PATCH.json',*(r['path'] for r in patch)}
+            assert sum(i.file_size for i in archive.infolist())<16*1024**2
+            for row in patch:
+                target=safe(source,row['path'])
+                assert not target.is_symlink()
+                if row['beforeSha256'] is None:
+                    assert not target.exists()
+                else:
+                    assert target.is_file() and sha(target)==row['beforeSha256']
+                info=archive.getinfo(row['path'])
+                assert not info.is_dir() and (info.external_attr>>16)&0o170000!=0o120000
+                data=archive.read(row['path'])
+                assert hashlib.sha256(data).hexdigest()==row['sha256']
+                target.parent.mkdir(parents=True,exist_ok=True)
+                target.write_bytes(data)
         inputs = WORK / 'inputs'
         run('decrypt-final-helper-input', ['node', transport, 'decrypt', '--manifest', HERE / 'FINAL_HELPERS.transport.json',
             '--id', 'final-helpers', '--input', HERE / 'final-helpers.enc', '--output', WORK / 'final-helpers.zip'],
             timeout=120, private=True)
         unzip(WORK / 'final-helpers.zip', inputs, limit=2 * 1024**2)
-        shutil.copyfile(WORK / 'source19-records.plain', inputs / 'source19-records.json')
+        records=json.loads((inputs/'source19-records.json').read_bytes())
+        assert records['sourceTree']==SOURCE_TREE and len(records['records'])==935
+        assert {p.relative_to(source).as_posix() for p in source.rglob('*') if p.is_file()}=={r['path'] for r in records['records']}
+        for row in records['records']:
+            file=safe(source,row['path'])
+            assert file.stat().st_size==row['bytes'] and sha(file)==row['sha256']
+        shutil.copyfile(inputs/'source19-records.json',WORK/'source19-records.plain')
         if sys.platform == 'win32':
             # Parse the actual decrypted PowerShell files before large downloads.
             # Windows PowerShell must construct its own compatible module path,

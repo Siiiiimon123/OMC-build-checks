@@ -1,64 +1,26 @@
 {
-  "schema": "omc-final-package19-bounded-execution-v1",
-  "baselineSourceTree": "1e39b9ae2921480b27d4a1a8bf5f8499004886fa",
+  "schema": "omc-current-package20-bounded-execution-v1",
+  "baselineSourceTree": "31b79bac263eef3e2c32e9fabe8537f8d77401be",
   "cloudDispatchApproved": true,
-  "approvalEvidence": "call_798509f8b9cb41509c787f2df6566a25",
-  "repository": "Siiiiimon123/OMC-build-checks",
-  "branch": "verify-final-package19",
-  "limits": {
-    "windowsMaxRuns": 3,
-    "macMaxRuns": 3,
-    "minutesEach": 90
-  },
   "feeUSD": 0,
   "automaticRerun": false,
-  "stopRepeatingSuccessfulStage": true,
-  "executed": {
-    "windows": 14,
-    "mac": 2
+  "limits": {
+    "windowsMaxRuns": 1,
+    "macMaxRuns": 1,
+    "minutesEach": 90
   },
-  "sameApprovedTwoPhotosOnly": true,
-  "plaintextProductSourceModelsPhotosKeysPublic": false,
-  "productionUpgradeRequiresUnblockedTrustedFeed": true,
-  "noNewPaidServicesOrSettings": true,
+  "approval": "Existing same-scope free continuation; user no repeated approval for such fixes",
+  "sameTwoApprovedRealPhotosOnly": true,
+  "sourceAndModelsPlaintextPublic": false,
+  "publicationOrAccelerationAuthorizedByThisJob": false,
   "mainChanged": false,
-  "verbatim": "\u5141\u8bb8\u6309\u6b64\u8303\u56f4\u5b8c\u6210\u6700\u7ec8\u4e91\u9a8c\u6536",
-  "nextSubmission": {
-    "platforms": [
-      "windows"
-    ],
-    "windowsAttempt": 15,
-    "mode": "ACTUAL_UNICODE_SHORTCUT_LAUNCH_WITH_UNCHANGED_PAYLOAD_PROOF_REUSE",
-    "artifact": 13402959173,
-    "sha256": "daade4392f5b77262fbd1f53b4ffbcb89e73290952f1a0779739c0ff8d97eb27",
-    "reason": "Run42014912441 proves original Unicode link really launches exact installed EXE/UI and native target/icon/AppID plus identical copy all correct. QA left Node inspector attached during quit, causing shutdown wait. Close both QA sockets before checking process exit; product and link unchanged.",
-    "approval": "User same-scope free continuation, no repeated questions",
-    "macRebuilt": false
-  },
-  "windowsSingleSupplement": {
-    "approvalEvidence": "call_a228625569b145959fba4c83e1a3d487",
-    "verbatim": "\u5141\u8bb8\u8865\u8fd91\u6b21 Windows \u9a8c\u6536",
-    "additionalWindowsRuns": 1,
-    "maximumTotalWindowsRuns": 4,
-    "minutesEach": 90,
-    "feeUSD": 0,
-    "automaticRerun": false
-  },
-  "windowsRawSourceSupplement": {
-    "approvalEvidence": "call_6b45632226634cca836f235044de0202",
-    "verbatim": "\u5141\u8bb8\u6309\u6b64\u4e0a\u9650\u8865\u5b8c Windows",
-    "additionalWindowsRuns": 2,
-    "maximumTotalWindowsRunsAtThisCheckpoint": 6,
-    "minutesEach": 90,
-    "feeUSD": 0,
-    "automaticRerun": false
-  },
-  "sameScopeContinuation": {
-    "userInstruction": "\u8fd9\u79cd\u95ee\u9898\u540e\u9762\u4e0d\u7528\u6765\u95ee\u6211\uff0c\u6211\u90fd\u540c\u610f",
-    "scope": "Same repository, branch, Secret and existing source/sample scope; free standard Windows QA after reading actual reports and fixing scripts; successful stages stop",
-    "minutesEach": 90,
-    "feeUSD": 0,
-    "newModelsOrPhotosAuthorized": false,
-    "blindAutomaticRerun": false
-  }
+  "productionUpgradeRequiresUnblockedTrustedFeed": true,
+  "technicalRejectCalibrationNotQualified": true,
+  "realThousandNotQualified": true,
+  "inheritedUiRun": 42209616242,
+  "inheritedUiSourceTree": "c1211e63d60ffff22bfdd4275ae4a84ffca82dee",
+  "sourceChangesSinceThatRun": [
+    "package.json version",
+    "package-lock.json root version metadata"
+  ]
 }

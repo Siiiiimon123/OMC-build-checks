@@ -20,7 +20,7 @@ import sys
 import tarfile
 import urllib.request
 
-BASE_TREE = '1e39b9ae2921480b27d4a1a8bf5f8499004886fa'
+BASE_TREE = '31b79bac263eef3e2c32e9fabe8537f8d77401be'
 RESOURCE_SHA = '9d75619194c66d1c6bbaeb5d7e63ad4b09b54605f99f7230289ab6f60378cc1a'
 
 
@@ -71,7 +71,7 @@ def main():
     args = parser.parse_args()
     assert os.environ.get('GITHUB_ACTIONS') == 'true'
     assert os.environ.get('GITHUB_REPOSITORY') == 'Siiiiimon123/OMC-build-checks'
-    assert os.environ.get('GITHUB_REF') == 'refs/heads/verify-final-package19'
+    assert os.environ.get('GITHUB_REF') == 'refs/heads/verify-optimization20'
     assert os.environ.get('GITHUB_RUN_ATTEMPT') == '1'
     assert sys.platform == 'darwin' and platform.machine() == 'arm64'
     assert platform.python_version() == '3.12.10'
@@ -85,7 +85,7 @@ def main():
     reports.mkdir()
     bundle.mkdir()
     result = {'schema': 'omc-final-native-mac-build-v1', 'status': 'RUNNING',
-        'baselineSourceTree': BASE_TREE, 'version': '1.0.21-preview.19',
+        'baselineSourceTree': BASE_TREE, 'version': '1.0.21-preview.20',
         'memberReleaseQualified': False, 'fullAiAccepted': False, 'inAppUpgradeAccepted': False,
         'DeveloperIdSigned': False, 'notarized': False, 'GatekeeperFirstDownload': 'UNVERIFIED'}
     env = {k: v for k, v in os.environ.items()
@@ -116,7 +116,7 @@ def main():
 
     try:
         manifest = read(records_path)
-        assert manifest['sourceTree'] == BASE_TREE and len(manifest['records']) == 932
+        assert manifest['sourceTree'] == BASE_TREE and len(manifest['records']) == 935
         for row in manifest['records']:
             file = safe(source, row['path'])
             assert file.stat().st_size == row['bytes'] and sha(file) == row['sha256'], row['path']
@@ -264,7 +264,7 @@ def main():
         run('bind-final-native-contract', [python, tools / 'finalize_mac_contract.py', app])
         run('seal-outer-app-only', ['/usr/bin/codesign', '--force', '--sign', '-', app])
         run('audit-final-native-app', [python, tools / 'audit_mac_app.py', app, reports / 'ARCHITECTURE_AUDIT.json'])
-        package = output / 'OMC-Preview-1.0.21-preview.19-mac-arm64-unsigned.pkg'
+        package = output / 'OMC-Preview-1.0.21-preview.20-mac-arm64-unsigned.pkg'
         build_nonrelocatable_pkg(app, work, package, run, reports)
         expanded = work / 'pkg-expanded-for-readback'
         run('expand-built-pkg', ['/usr/sbin/pkgutil', '--expand-full', package, expanded])
