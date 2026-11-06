@@ -91,7 +91,7 @@ try:
                    for p in source.rglob('*') if p.is_file()], key=lambda x: x[0])
     digest = hashlib.sha256(json.dumps(rows, ensure_ascii=False, separators=(',', ':')).encode('utf-8')).hexdigest()
     expected = json.loads((HERE / 'engine-baseline-input.json').read_bytes())
-    if expected['sourceTree'] != '6f25b1b4f45ffd97301e6e53b30a8c99ce071368' or len(rows) != 935 or digest != 'c11c26e7c2214a7ea00d86a94cdc955e46a4ce557353a8490334f5455e896630':
+    if expected['sourceTree'] != '2403c7bffccb40dadfcc7738af175f5ac6a8024f' or len(rows) != 935 or digest != '18322f4bf75638e820f3ed7242f4d887f2f7489868b4a3679b9b39f0f4db2f40':
         raise RuntimeError('FROZEN_SOURCE_IDENTITY')
     (REPORTS / 'FROZEN_INPUTS.json').write_text(json.dumps({**expected,
         'verifiedSourcePathSha256Digest': digest, 'controlCommit': os.environ.get('GITHUB_SHA'),
@@ -124,10 +124,13 @@ try:
         fixtures.append(fixture)
     npm = 'npm.cmd' if os.name == 'nt' else 'npm'
     stage('dependencies', [npm, 'ci', '--ignore-scripts', '--no-audit', '--no-fund'], source, 300)
-    (REPORTS / 'INHERITED_SOURCE_CHECKS.json').write_text(json.dumps({
-        'sourceTree': expected['sourceTree'], 'controlCommit':'1570869a6fe2999665bd366b5ba40615fa6b0b50',
-        'run':42204835316,'sameSourceCoreBrowserBuildAndExactRgbPassedBothPlatforms':True,
-        'onlyRealContinuousTimingRetested':True}), encoding='utf-8')
+    stage('core', [npm, 'run', 'test:core'], source, 180)
+    stage('browser-preview', [npm, 'run', 'test:browser-preview'], source, 120)
+    if hashlib.sha256((source/'src/services/jpegSaturation.js').read_bytes()).hexdigest()!='bf768defff1233f174052e793bddbd325da3ceb0ce4355ec724df2317b5598cd':
+        raise RuntimeError('INHERITED_PIXEL_KERNEL_CHANGED')
+    (REPORTS / 'UNCHANGED_PIXEL_KERNEL_PROOF.json').write_text(json.dumps({
+        'run':42204835316,'onlyCpuKernelBytesUnchangedAndInherited':True,
+        'notInheritanceOfNewUiOrService':True}), encoding='utf-8')
     previous = source / 'preview-manifest.json'
     if previous.exists():
         previous.rename(REPORTS / 'previous-preview-manifest.json')
@@ -158,8 +161,8 @@ finally:
         if gui.get('bReopened'):
             safe['bReopened'] = {key:gui['bReopened'].get(key) for key in ('ev','saturation','texture')}
         safe['timingObservations']=gui.get('timingObservations')
-        safe['duringDrag']={key:(gui.get('duringDrag') or {}).get(key) for key in ('width','height','quality','busy')}
-        safe['afterDrag']={key:(gui.get('afterDrag') or {}).get(key) for key in ('width','height','quality','busy')}
+        safe['duringDrag']={key:(gui.get('duringDrag') or {}).get(key) for key in ('width','height','displayWidth','displayHeight','devicePixelRatio','quality','busy')}
+        safe['afterDrag']={key:(gui.get('afterDrag') or {}).get(key) for key in ('width','height','displayWidth','displayHeight','devicePixelRatio','quality','busy')}
         print(json.dumps({'jpegGuiOutcome':safe}),flush=True)
     finished_path=REPORTS / 'native-synthetic/evidence/FINISHED_FLOW.json'
     if finished_path.is_file():
@@ -170,7 +173,7 @@ finally:
             'persistentExportStatusVerified':finished.get('persistentExportStatusVerified')
         }}),flush=True)
     (REPORTS / 'SUMMARY.json').write_text(json.dumps({'status': status, 'platform': sys.platform,
-        'stages': stages, 'sourceTree': '6f25b1b4f45ffd97301e6e53b30a8c99ce071368',
+        'stages': stages, 'sourceTree': '2403c7bffccb40dadfcc7738af175f5ac6a8024f',
         'memberPhotos': ['sample-a', 'sample-b'], 'scriptDrivenRealGui': True,
         'installedPackageTested': False, 'completeAiTested': False, 'realThousandTested': False,
         'published': False}), encoding='utf-8')

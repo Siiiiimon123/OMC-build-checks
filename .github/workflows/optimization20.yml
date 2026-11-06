@@ -1,4 +1,4 @@
-name: R30 displayed JPEG save readiness and group export
+name: R31 displayed JPEG save readiness and group export
 'on':
   push:
     branches: ['verify-optimization20']
