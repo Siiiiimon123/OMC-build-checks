@@ -1,0 +1,9 @@
+{
+  "sourceTree": "b3c0778f7b8f35e511295bea6f0af02910de840b",
+  "sourceFiles": 946,
+  "patchFiles": 8,
+  "pkgAdapterSha256": "3c1f523943522d01f778424aed85c22f6fc159637eff988d3d9d066c30e17792",
+  "parts": 10,
+  "logicSource": "a3f7ecf66b42d4d5ff11a91a5d077a114026da94",
+  "version": "1.0.21-preview.22"
+}
