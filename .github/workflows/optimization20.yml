@@ -1,4 +1,4 @@
-name: R26 saturation exact-output CPU optimization
+name: R27 bounded synthetic display precision and existing report readout
 'on':
   push:
     branches: ['verify-optimization20']
@@ -37,7 +37,8 @@ jobs:
           OMC_R24_ANALYSIS_YIELD: '0'
           OMC_R24_NATIVE_YIELD_ONLY: '0'
           OMC_R25_INFERENCE_WAVE: '0'
-          OMC_R26_SATURATION_KERNEL: '1'
+          OMC_R26_SATURATION_KERNEL: '0'
+          OMC_R27_SVG_PROBE_ONLY: '1'
           OMC_R20_TIMING_ONLY: '1'
           OMC_R20_FAST_DISPLAY: '1'
           OMC_R20_FINISHED_FLOW: '0'

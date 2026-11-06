@@ -103,6 +103,31 @@ try:
     npm='npm.cmd' if os.name=='nt' else 'npm'
     if not stage('dependencies',[npm,'ci','--ignore-scripts','--no-audit','--no-fund'],source,timeout=420):
         raise RuntimeError('DEPENDENCY_PREPARATION_FAILED')
+    if os.environ.get('OMC_R27_SVG_PROBE_ONLY')=='1':
+        if expected['sourceTree']!='807fd90162a5a25d055c220580c0b5dba9bb9dda' or expected['sourcePathSha256Digest']!='4f612d83d6248f63a1220cc6fa3ae614cf4dac7f702368cf5e57129ba47f319b':
+            raise RuntimeError('INHERITED_SOURCE_CHECKS_NO_LONGER_APPLY')
+        (REPORTS/'INHERITED_SOURCE_CHECKS.json').write_text(json.dumps({
+            'run':42183690840,'sameCompleteSourceDigest':True,'sourceTestsRepeated':False,
+            'saturationFullRgbDifferentialPassed':True,'currentDisplayProbeIntegrated':False}),encoding='utf-8')
+        # Read only the already approved two-photo output in the same VM/key
+        # scope. A transport failure does not block the independent colour probe.
+        readout_ok=stage('prior-jpeg-race-authenticated-readout',['node',str(HERE/'read-jpeg-race-report.cjs'),
+            str(source),str(TRANSPORT),str(REPORTS)],source,timeout=150,private_env=True)
+        if readout_ok:
+            receipt=json.loads((REPORTS/'readout-jpeg-race/READOUT_RECEIPT.json').read_bytes())
+            print(json.dumps({'priorJpegRaceReadout':receipt}),flush=True)
+        else:
+            print(json.dumps({'priorJpegRaceReadoutAvailable':False}),flush=True)
+        child_env.pop('ELECTRON_SKIP_BINARY_DOWNLOAD',None)
+        ready=stage('electron-runtime',['node','node_modules/electron/install.js'],source,timeout=300)
+        if ready:
+            case=REPORTS/'native-svg-probe';case.mkdir()
+            ok=stage('native-synthetic-saturation-svg-probe',['node',str(HERE/'cloud-svg-saturation-probe.mjs'),
+                str(source),str(case)],source,timeout=240)
+            if ok:
+                probe=json.loads((case/'evidence/SVG_DISPLAY_PROBE.json').read_bytes())
+                print(json.dumps({'syntheticSvgProbe':probe['probe'],'productIntegrated':False}),flush=True)
+        raise SystemExit(0 if ok else 1)
     if os.environ.get('OMC_R24_NATIVE_YIELD_ONLY')=='1':
         if expected['sourceTree']!='857898e7731bc52e4f72e9aad3cff37b6966f25e' or expected['sourcePathSha256Digest']!='b17eef7ba9a0cfafb4989f24fe30bb59d50c9c10a294ff7d76610410eb1eb271':
             raise RuntimeError('INHERITED_SOURCE_CHECKS_NO_LONGER_APPLY')
