@@ -180,7 +180,10 @@ finally{
    }
    entry.exitCode=p.exitCode;entry.signal=p.signalCode;entry.settled=p.exitCode!==null||p.signalCode!==null;report.cleanup.push(entry);p.unref();
    if(!entry.settled){report.status='FAIL_CLEANUP';process.exitCode=1;}
-  }else{await new Promise(resolve=>{const k=spawn('taskkill',['/PID',String(p.pid),'/T','/F'],{stdio:'ignore'});k.on('exit',resolve);});}
+  }else{await new Promise(resolve=>{const k=spawn('taskkill',['/PID',String(p.pid),'/T','/F'],{stdio:'ignore'});k.on('exit',resolve);k.on('error',()=>resolve());});
+   const deadline=Date.now()+5000;while(p.exitCode===null&&p.signalCode===null&&Date.now()<deadline)await delay(50);
+   const settled=p.exitCode!==null||p.signalCode!==null;report.cleanup.push({pid:p.pid,role:p===app?'app':'vite',settled,exitCode:p.exitCode,signal:p.signalCode});
+   if(!settled){report.status='FAIL_CLEANUP';process.exitCode=1;}}
  }
  for(const p of pending.values()){clearTimeout(p.t);p.reject(Error('TEST_FINISHED'));}pending.clear();try{ws?.close();}catch{}
  fs.writeFileSync(path.join(out,'JPEG_FUNCTIONAL.json'),JSON.stringify(report,null,2));fs.closeSync(log);
