@@ -40,6 +40,12 @@ def stage(name, command, cwd=WORK, timeout=240, private=False):
     stages.append(row)
     print(json.dumps(row), flush=True)
     if r.returncode:
+        # Core tests use repository-owned synthetic fixtures; reveal only the
+        # bounded test titles, never assertion bodies, paths or source stacks.
+        if name in ('core','browser-preview'):
+            titles=re.findall(r'(?m)^not ok \d+ - ([^\r\n]{1,180})',r.stdout.decode('utf-8','replace'))
+            titles=[title for title in titles if '://' not in title and ':\\' not in title][:12]
+            print(json.dumps({'failedTestStage':name,'failedTestTitles':titles}),flush=True)
         raise RuntimeError('STAGE_FAILED:' + name)
 
 def decrypt(cipher, manifest, identity, target):
@@ -85,7 +91,7 @@ try:
                    for p in source.rglob('*') if p.is_file()], key=lambda x: x[0])
     digest = hashlib.sha256(json.dumps(rows, ensure_ascii=False, separators=(',', ':')).encode('utf-8')).hexdigest()
     expected = json.loads((HERE / 'engine-baseline-input.json').read_bytes())
-    if expected['sourceTree'] != 'cfaff40563f799c4fe5b9dbbbe68bc8a34c90202' or len(rows) != 935 or digest != 'b7e40488a4195ca3e6d80b90395ab2dc04ab1d928075e14cbad208f7fff8ad0b':
+    if expected['sourceTree'] != '79c8146ebdb2166030345d05c60149a4c531bfcf' or len(rows) != 935 or digest != '1da21f75fdfa0292bfc2ac0d265666ae954b651b4d074ee6808172e364593ac5':
         raise RuntimeError('FROZEN_SOURCE_IDENTITY')
     (REPORTS / 'FROZEN_INPUTS.json').write_text(json.dumps({**expected,
         'verifiedSourcePathSha256Digest': digest, 'controlCommit': os.environ.get('GITHUB_SHA'),
@@ -178,7 +184,7 @@ finally:
             'persistentExportStatusVerified':finished.get('persistentExportStatusVerified')
         }}),flush=True)
     (REPORTS / 'SUMMARY.json').write_text(json.dumps({'status': status, 'platform': sys.platform,
-        'stages': stages, 'sourceTree': 'cfaff40563f799c4fe5b9dbbbe68bc8a34c90202',
+        'stages': stages, 'sourceTree': '79c8146ebdb2166030345d05c60149a4c531bfcf',
         'memberPhotos': ['sample-a', 'sample-b'], 'scriptDrivenRealGui': True,
         'installedPackageTested': False, 'completeAiTested': False, 'realThousandTested': False,
         'published': False}), encoding='utf-8')
