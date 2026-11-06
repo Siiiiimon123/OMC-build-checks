@@ -1,0 +1,14 @@
+{
+  "schema": "omc-aes256gcm-build-transport-v1",
+  "assets": [
+    {
+      "id": "current-source-checks",
+      "plaintextBytes": 315375,
+      "plaintextSha256": "5258c0bb418dd6f0d37fb9e7450ae0f82091cdcde36af80b1213447af4a378dc",
+      "ciphertextBytes": 315375,
+      "nonceHex": "0928d862b5481d4df3f78193",
+      "ciphertextSha256": "92f397c840c5f2ffb6d13f4bc8b9e9d977feb5a8ecf77e3eb1eee2af954a0ef2",
+      "tagHex": "cb179123bcbba05d925e81d6c0001d87"
+    }
+  ]
+}
