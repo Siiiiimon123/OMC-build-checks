@@ -1,6 +1,6 @@
 """Exercise frozen candidate AST with real ORT/models, not installed-app acceptance."""
 from pathlib import Path
-import ast,contextlib,hashlib,json,os,platform,statistics,sys,time
+import ast,contextlib,hashlib,json,os,platform,statistics,sys,time,uuid
 import numpy as np
 import onnxruntime as ort
 
@@ -10,10 +10,13 @@ assert ort.__version__=='1.19.2' and np.__version__=='2.5.2'
 out_dir.mkdir()
 names={'_create_session_options','_fixed_session_inputs','_probe_outputs_match',
        '_mac_probe_prefers_cpu','_probe_mac_cpu_preference'}
-nodes=[n for n in ast.parse(source.read_text(encoding='utf8')).body if isinstance(n,ast.FunctionDef) and n.name in names]
-assert {n.name for n in nodes}==names
+nodes=[n for n in ast.parse(source.read_text(encoding='utf8')).body
+    if (isinstance(n,ast.FunctionDef) and n.name in names)
+    or (isinstance(n,ast.Assign) and any(isinstance(t,ast.Name) and t.id=='_ORT_NUMPY_TYPES' for t in n.targets))]
+assert {n.name for n in nodes if isinstance(n,ast.FunctionDef)}==names and len(nodes)==6
 space={'sys':sys,'os':os,'np':np,'time':time,'ort':ort,'CPU_PROVIDER':'CPUExecutionProvider',
     'DIRECTML_PROVIDER':'DmlExecutionProvider','DML_PROBE_ATOL':1e-3,'DML_PROBE_RTOL':1e-3,
+    'uuid':uuid,'_profile_path_for_io':lambda p:p,'RUNTIME_PROFILE_DIR':out_dir,
     'runtime_generation_is_current':lambda _:True,
     'ort_session_evidence_lock':contextlib.nullcontext(),'ort_session_evidence_bindings':{}}
 exec(compile(ast.Module(body=nodes,type_ignores=[]),str(source),'exec'),space)
