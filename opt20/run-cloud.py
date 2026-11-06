@@ -143,45 +143,7 @@ try:
         raise SystemExit(0 if ok else 1)
     if os.environ.get('OMC_R20_SOURCE_GUARDS_ONLY')=='1':
         checks=[]
-        if os.environ.get('OMC_R35_SUBJECT_FOCUS')=='1':
-            checks.append(stage('native-focus-facts-and-proposals',['node','--test',
-                'src/services/subjectFocusMeasurement.test.js',
-                'src/services/subjectFocusPolicy.test.js',
-                'src/services/subjectFocusOriginal.test.js',
-                'src/services/subjectFocusOriginal.worker.test.js',
-                'src/services/conservativeAutomaticReview.test.js'],source))
-        if os.environ.get('OMC_R34_TECHNICAL_REFERENCE')=='1':
-            checks.append(stage('technical-reference-and-decision-boundaries',['node','--test',
-                'src/services/ai/technicalWasteEvaluator.test.js',
-                'src/services/ai/technicalWasteDecisionProtection.test.js',
-                'src/services/ai/wasteDecisionPolicy.test.js',
-                'src/services/conservativeAutomaticReview.test.js'],source))
-        if os.environ.get('OMC_R26_SATURATION_KERNEL')=='1':
-            checks.append(stage('saturation-production-delegation-contracts',['node','--test',
-                'src/services/jpegSaturation.test.js','src/services/jpegContrast.test.js',
-                'src/services/jpegWhiteBalance.test.js','src/services/jpegTones.test.js',
-                'src/services/jpegVibranceRecipe.test.js','src/services/jpegExposurePipeline.test.js'],source))
-        if os.environ.get('OMC_R25_INFERENCE_WAVE')=='1':
-            checks.append(stage('inference-wave-contracts',['node','--test',
-                'src/services/ai/modelLoaderBatch.test.js'],source))
-        if os.environ.get('OMC_R24_ANALYSIS_YIELD')=='1':
-            checks.append(stage('analysis-yield-contracts',['node','--test','--test-name-pattern','analysis yield',
-                'src/services/analysisPerformance.test.js'],source))
-        if os.environ.get('OMC_R23_TECHNICAL_AND_PREVIEW')=='1':
-            checks.append(stage('directional-triage-and-neutral-preview-contracts',['node','--test',
-                'src/services/ai/technicalWasteEvaluator.test.js',
-                'src/services/automaticAdjustmentPreview.test.js'],source))
-        if os.environ.get('OMC_R21_INCREMENTAL')=='1':
-            checks.append(stage('source-recovery-compatibility',['node','--test','src/services/sourceRecoveryEdits.test.js',
-                'src/services/sourceRecoveryGroupPreservation.test.js'],source))
-        if os.environ.get('OMC_R20_COMMIT_WAVE')=='1':
-            checks.append(stage('durable-analysis-wave-contracts',['node','--test','src/services/analysisPerformance.test.js',
-                'src/services/analysisTerminalCommit.test.js','src/services/ai/modelLoaderBatch.test.js'],source))
-        checks.extend([stage('core',[npm,'run','test:core'],source),
-            stage('browser-preview',[npm,'run','test:browser-preview'],source)])
-        previous=source/'preview-manifest.json'
-        if previous.exists():previous.rename(REPORTS/'previous-preview-manifest.json')
-        checks.append(stage('build-browser-preview',[npm,'run','build:browser-preview'],source))
+        (REPORTS/'SCOPE.json').write_text(json.dumps({'componentOnly':True,'sourceTree':expected['sourceTree'],'sourceFiles':expected['sourceFiles'],'inheritedWindowsSourceRun':42245368020,'macSourceRunPendingAtDispatch':True,'repeatPriorCoreAndBuild':False,'newNativePatchFiles':6,'newFullOriginals':0}),encoding='utf8')
         if all(checks) and os.environ.get('OMC_R35_SUBJECT_FOCUS')=='1':
             scoped=HERE.parent/'focus35'
             manifest=json.loads((scoped/'FIXTURES.transport.json').read_bytes())
@@ -201,12 +163,24 @@ try:
                 assert set(z.namelist())=={'INPUTS.json','R2-04-overview.jpg','R2-04-crop.png','R2-08-overview.jpg','R2-08-crop.png'}
                 assert sum(i.file_size for i in z.infolist())<=2*1024**2
                 z.extractall(fixture_root)
+            native_cipher=WORK/'native-patches.enc'
+            native_cipher.write_bytes(base64.b64decode((HERE/'native-patches.b64').read_text(encoding='ascii'),validate=True))
+            native_archive=WORK/'native-patches.zip'
+            if not stage('authenticate-native-patches',['node',str(TRANSPORT),'decrypt',
+                '--input',str(native_cipher),'--manifest',str(HERE/'native-patches.transport.json'),
+                '--id','native-subject-patches','--output',str(native_archive)],private_env=True):
+                raise RuntimeError('NATIVE_PATCH_AUTHENTICATION')
+            native_root=fixture_root/'native';native_root.mkdir()
+            with zipfile.ZipFile(native_archive) as z:
+                assert set(z.namelist())=={'INPUTS.json',*[c+'-'+r+'.png' for c in ['R2-04','R2-08'] for r in ['head','upper-body','body']]}
+                assert sum(i.file_size for i in z.infolist())<=4*1024**2
+                z.extractall(native_root)
             shutil.copyfile(scoped/'BODY_CANDIDATE.json',fixture_root/'BODY_CANDIDATE.json')
             child_env.pop('ELECTRON_SKIP_BINARY_DOWNLOAD',None)
             checks.append(stage('electron-runtime',['node','node_modules/electron/install.js'],source,timeout=300))
             if all(checks):
                 case=REPORTS/'native-focus';case.mkdir()
-                checks.append(stage('existing-face-native-focus-probe',['node',str(HERE/'cloud-subject-focus.mjs'),
+                checks.append(stage('existing-face-native-focus-probe',['node',str(HERE/'cloud-native-patches.mjs'),
                     str(source),str(case),str(fixture_root)],source,timeout=420))
         if all(checks) and os.environ.get('OMC_R34_TECHNICAL_REFERENCE')=='1':
             checks.append(stage('actual-react-risk-reference-render',['node',str(HERE/'cloud-technical-reference.mjs'),
@@ -408,6 +382,8 @@ finally:
             'installerBuilt':False,'published':False}
     if os.environ.get('OMC_R35_SUBJECT_FOCUS')=='1':
         result.update(memberPhotosUsed=True,anonymousDerivativesUsed=True,fullOriginalsUploadedByThisRun=False)
+    if os.environ.get('OMC_R38_NATIVE_PATCHES')=='1':
+        result.update(status='PASS_NATIVE_COMPONENT_NOT_RELEASE' if ok else 'FAIL_NATIVE_COMPONENT',coreRepeated=False,fullAiTested=False,wholeOriginalSubjectRejectionTested=False)
     if os.environ.get('OMC_R20_ENGINE_BASELINE')=='1':
         result['status']='PASS_IMMUTABLE_ENGINE_BASELINE_NOT_CURRENT_PRODUCT' if ok else 'FAIL_IMMUTABLE_ENGINE_BASELINE'
         result['engineBaselineOnly']=True

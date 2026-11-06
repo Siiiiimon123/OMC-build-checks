@@ -1,9 +1,10 @@
 {
-  "url": "https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite0/int8/1/efficientdet_lite0.tflite?generation=1682636013497226",
-  "bytes": 4602795,
-  "generation": "1682636013497226",
-  "md5Base64": "zr9kr2w15avXNElGhQZIQg==",
-  "scope": "Isolated candidate on already approved anonymous overviews; not product distribution",
-  "source": "https://developers.google.com/edge/mediapipe/solutions/vision/object_detector",
-  "weightDistributionLicense": "Pending exact asset provenance/notice verification; no distribution authorized by this probe"
+  "url": "https://www.kaggle.com/models/tensorflow/efficientdet/TfLite/lite0-detection-metadata/1/download",
+  "bytes": 4563519,
+  "sha256": "2e04c53bfeac0ac2a30c057c7e2a777594ce39baaac35a92f74fb1e8c4fc4e0b",
+  "archiveBytes": 3328249,
+  "archiveSha256": "0799da1decd268958a9eb8341aab08eb99dee27b0ffdf9924e10ce428a97e854",
+  "license": "Apache-2.0",
+  "licenseEvidence": "https://www.kaggle.com/api/v1/models/list?owner=tensorflow&search=efficientdet",
+  "scope": "Isolated explicitly licensed upstream candidate; no product model substitution before actual test"
 }

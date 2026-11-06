@@ -1,0 +1,140 @@
+// Isolated cloud diagnosis of existing face landmarks and native ROI facts.
+// It never writes product decisions or treats a missing face as technical waste.
+import fs from 'node:fs';
+import path from 'node:path';
+import {spawn} from 'node:child_process';
+import {createHash} from 'node:crypto';
+import {createRequire} from 'node:module';
+import {pathToFileURL} from 'node:url';
+import {gunzipSync} from 'node:zlib';
+const [source,work,inputs]=process.argv.slice(2),require=createRequire(path.join(source,'package.json'));
+const delay=ms=>new Promise(r=>setTimeout(r,ms)),hash=b=>createHash('sha256').update(b).digest('hex');
+const check=(ok,m)=>{if(!ok)throw Error(m);};
+check(process.env.GITHUB_ACTIONS==='true'&&process.env.GITHUB_REPOSITORY==='Siiiiimon123/OMC-build-checks'
+ &&process.env.GITHUB_REF==='refs/heads/verify-optimization20'&&process.env.GITHUB_RUN_ATTEMPT==='1','OWNED_CLOUD_ONLY');
+const evidence=path.join(work,'evidence');fs.mkdirSync(evidence,{recursive:true});
+const report={schema:'omc-existing-face-native-focus-probe-v1',status:'RUNNING',platform:process.platform,
+ images:'Only four previously shown anonymized overview/native crop files; no new full originals',
+ newModelAdded:false,automaticRejectionTested:false,installedPackageTested:false,rows:[]};
+const bodyProbe=process.env.OMC_R36_BODY_PROBE==='1';
+const productWorkerProbe=false;
+if(bodyProbe){report.schema='omc-isolated-person-candidate-probe-v1';report.newModelAdded=true;report.candidateModelTested=true;report.candidateIntegratedIntoProduct=false;}
+const log=fs.openSync(path.join(evidence,'source-app.log'),'a');let app,server,ws,seq=0;const pending=new Map();
+const env={...process.env};for(const k of Object.keys(env))if(/^(OMC_|GH_TOKEN|GITHUB_TOKEN|ELECTRON_RUN_AS_NODE)/.test(k))delete env[k];
+function call(method,params={}){return new Promise((resolve,reject)=>{const id=++seq,t=setTimeout(()=>{pending.delete(id);reject(Error('CDP_TIMEOUT:'+method));},120000);pending.set(id,{resolve,reject,t});ws.send(JSON.stringify({id,method,params}));});}
+async function evaluate(expression){const r=await call('Runtime.evaluate',{expression:'(async()=>JSON.stringify(await ('+expression+')))()',returnByValue:true,awaitPromise:true});check(!r.exceptionDetails,'RENDERER_EXCEPTION:'+JSON.stringify(r.exceptionDetails??{}).slice(0,1000));return JSON.parse(r.result.value);}
+try{
+ const fixtures=JSON.parse(fs.readFileSync(path.join(inputs,'INPUTS.json'),'utf8'));
+ check(fixtures.files.length===4&&fixtures.files.every(f=>/^(R2-04|R2-08)-(overview\.jpg|crop\.png)$/.test(f.file)),'FOUR_EXACT_FIXTURES');
+ const routes=new Map();
+ for(const f of fixtures.files){const p=path.join(inputs,f.file),b=fs.readFileSync(p);check(b.length===f.bytes&&hash(b)===f.sha256,'FIXTURE_IDENTITY');routes.set('/__focus-fixture/'+f.file,{path:p,type:f.file.endsWith('.png')?'image/png':'image/jpeg'});}
+ const contract=JSON.parse(fs.readFileSync(path.join(source,'contracts/frontend-face-runtime-v1.json'),'utf8'));
+ const assets=[];
+ for(const row of contract.assets){
+  if(bodyProbe&&row.path.endsWith('.task'))continue;
+  const p=row.path.endsWith('.task')?path.join(work,'face_landmarker.task'):path.join(source,'node_modules/@mediapipe/tasks-vision/wasm',path.basename(row.path));
+  if(row.path.endsWith('.task')){
+   // Exactly the model URL and expected bytes already used by the native Mac builder.
+   const response=await fetch('https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task',{signal:AbortSignal.timeout(90000)});
+   check(response.ok,'EXISTING_FACE_MODEL_HTTP');const chunks=[];let count=0;
+   for await(const chunk of response.body){count+=chunk.length;check(count<=row.sizeBytes,'FACE_MODEL_BYTE_LIMIT');chunks.push(chunk);}
+   const bytes=Buffer.concat(chunks);check(count===row.sizeBytes&&hash(bytes)===row.sha256,'EXISTING_FACE_MODEL_IDENTITY');fs.writeFileSync(p,bytes,{flag:'wx'});
+  }
+  const bytes=fs.readFileSync(p);check(bytes.length===row.sizeBytes&&hash(bytes)===row.sha256,'LOCKED_FACE_ASSET_IDENTITY');
+  routes.set('/'+row.path.slice('public/'.length),{path:p,type:p.endsWith('.wasm')?'application/wasm':p.endsWith('.js')?'text/javascript':'application/octet-stream'});
+  assets.push({path:row.path,bytes:bytes.length,sha256:hash(bytes)});
+ }
+ report.assets=assets;
+ if(bodyProbe){
+  const config=JSON.parse(fs.readFileSync(path.join(inputs,'BODY_CANDIDATE.json'),'utf8'));
+  check(config.bytes===4563519 && config.sha256==='2e04c53bfeac0ac2a30c057c7e2a777594ce39baaac35a92f74fb1e8c4fc4e0b','FROZEN_APACHE_UPSTREAM');
+  const response=await fetch(config.url,{signal:AbortSignal.timeout(90000)});check(response.ok,'UPSTREAM_MODEL_HTTP');
+  const chunks=[];let n=0;for await(const c of response.body){n+=c.length;check(n<=config.archiveBytes,'MODEL_ARCHIVE_LIMIT');chunks.push(c);}
+  const archive=Buffer.concat(chunks);check(n===config.archiveBytes&&hash(archive)===config.archiveSha256,'MODEL_ARCHIVE_IDENTITY');
+  const tar=gunzipSync(archive,{maxOutputLength:7000000}),members=[];
+  for(let off=0;off+512<=tar.length;){const head=tar.subarray(off,off+512),name=head.subarray(0,100).toString().replace(/\0.*$/s,''),len=parseInt(head.subarray(124,136).toString().replace(/\0.*$/s,'').trim()||'0',8);if(!name)break;check(Number.isSafeInteger(len)&&len>=0&&off+512+len<=tar.length,'MODEL_TAR_BOUNDS');members.push({name,data:tar.subarray(off+512,off+512+len)});off+=512+Math.ceil(len/512)*512;}
+  check(members.length===1&&members[0].name==='1.tflite','EXACT_MODEL_MEMBER');const bytes=members[0].data;
+  check(bytes.length===config.bytes&&hash(bytes)===config.sha256,'EXACT_APACHE_MODEL_IDENTITY');n=bytes.length;
+  const p=path.join(work,'person-candidate.tflite');fs.writeFileSync(p,bytes,{flag:'wx'});
+  routes.set('/models/subject-person-candidate.tflite',{path:p,type:'application/octet-stream'});
+  report.candidateModel={bytes:n,sha256:hash(bytes),url:config.url,provider:'CPU',
+   embeddedLicenseHints:(bytes.toString('latin1').match(/[\x20-\x7e]{12,}/g)??[]).filter(s=>/apache|licen[cs]e|tensorflow\.org/i.test(s)).slice(0,12)};
+ }
+ const nativeInputs=JSON.parse(fs.readFileSync(path.join(inputs,'native','INPUTS.json'),'utf8'));
+ check(nativeInputs.files===6&&nativeInputs.cases.length===2,'EXACT_SIX_NATIVE_PATCHES');
+ for(const c of nativeInputs.cases)for(const f of c.files){const p=path.join(inputs,'native',f.file),b=fs.readFileSync(p);check(b.length===f.bytes&&hash(b)===f.sha256,'NATIVE_PATCH_IDENTITY');routes.set('/__native-patch/'+f.file,{path:p,type:'image/png'});}
+ const vite=await import(pathToFileURL(require.resolve('vite')).href),{createServer}=vite.default??vite;
+ server=await createServer({root:source,logLevel:'error',server:{host:'127.0.0.1',port:5173,strictPort:true},plugins:[{name:'owned-focus-fixtures',configureServer(s){s.middlewares.use((req,res,next)=>{const p=new URL(req.url,'http://localhost').pathname,row=routes.get(p);if(!row)return next();const b=fs.readFileSync(row.path);res.setHeader('Content-Type',row.type);res.setHeader('Content-Length',b.length);res.end(b);});}}]});await server.listen();
+ const profile=path.join(work,'profile'),binary=process.platform==='win32'?'node_modules/electron/dist/electron.exe':'node_modules/electron/dist/Electron.app/Contents/MacOS/Electron';
+ app=spawn(path.join(source,binary),[source,'--user-data-dir='+profile,'--remote-debugging-port=0','--no-first-run'],{cwd:source,env,stdio:['ignore',log,log],detached:process.platform==='darwin'});
+ let target;for(let n=0;n<200;n++){try{const port=Number(fs.readFileSync(path.join(profile,'DevToolsActivePort'),'utf8').split('\n')[0]);target=(await(await fetch('http://127.0.0.1:'+port+'/json/list')).json()).find(p=>p.type==='page'&&p.url.startsWith('http://localhost:5173'));if(target)break;}catch{}await delay(250);}check(target,'SOURCE_RENDERER_NOT_READY');
+ ws=new WebSocket(target.webSocketDebuggerUrl);await new Promise((r,j)=>{const t=setTimeout(()=>j(Error('CDP_OPEN')),10000);ws.addEventListener('open',()=>{clearTimeout(t);r();},{once:true});ws.addEventListener('error',()=>{clearTimeout(t);j(Error('CDP_OPEN'));},{once:true});});
+ ws.addEventListener('message',e=>{const m=JSON.parse(e.data),p=pending.get(m.id);if(p){pending.delete(m.id);clearTimeout(p.t);m.error?p.reject(Error(JSON.stringify(m.error))):p.resolve(m.result);}});await call('Runtime.enable');
+ for(const f of fixtures.files.filter(f=>f.file.endsWith('-overview.jpg'))){
+  if(bodyProbe){
+   if(productWorkerProbe && f.file.endsWith('-overview.jpg')) {
+    const row=await evaluate(`(async()=>{
+     const {verifySubjectFocusOriginal,releaseSubjectFocusWorker}=await import('/src/services/subjectFocusOriginal.js');
+     const bytes=new Uint8Array(await(await fetch(${JSON.stringify('/__focus-fixture/'+f.file)})).arrayBuffer());
+     let ticks=0;const timer=setInterval(()=>ticks++,10),start=performance.now();
+     try{const metrics=await verifySubjectFocusOriginal(bytes,{assets:{wasmUrl:location.origin+'/mediapipe/wasm',modelUrl:location.origin+'/models/subject-person-candidate.tflite'}});
+      return{elapsedMs:performance.now()-start,mainThreadTicks:ticks,metrics};
+     }finally{clearInterval(timer);releaseSubjectFocusWorker();}
+    })()`);
+    check(row.metrics.sourceKind==='original-jpeg-subject-regions','PRODUCT_WORKER_EVIDENCE_KIND');
+    check(row.mainThreadTicks>0,'MAIN_THREAD_DID_NOT_YIELD');
+    report.rows.push({file:f.file,inputSha256:f.sha256,workerTested:true,...row});continue;
+   }
+   if(f.file.endsWith('-crop.png')){
+    const row=await evaluate(`(async()=>{const {measureNativeSubjectFocus}=await import('/src/services/subjectFocusMeasurement.js');const image=new Image();image.src=${JSON.stringify('/__focus-fixture/'+f.file)};await image.decode();const c=document.createElement('canvas');c.width=image.naturalWidth;c.height=image.naturalHeight;const x=c.getContext('2d',{willReadFrequently:true});x.drawImage(image,0,0);const facts=measureNativeSubjectFocus(x.getImageData(0,0,c.width,c.height).data,c.width,c.height);c.width=c.height=1;return{width:image.naturalWidth,height:image.naturalHeight,facts};})()`);
+    report.rows.push({file:f.file,inputSha256:f.sha256,...row});continue;
+   }
+   const row=await evaluate(`(async()=>{
+    const {FilesetResolver,ObjectDetector}=await import('/node_modules/@mediapipe/tasks-vision/vision_bundle.mjs');
+    if(!window.__focusPersonDetector){const files=await FilesetResolver.forVisionTasks('/mediapipe/wasm');window.__focusPersonDetector=await ObjectDetector.createFromOptions(files,{baseOptions:{modelAssetPath:'/models/subject-person-candidate.tflite',delegate:'CPU'},runningMode:'IMAGE',scoreThreshold:.35,maxResults:32,categoryAllowlist:['person']});}
+    const image=new Image();image.src=${JSON.stringify('/__focus-fixture/'+f.file)};await image.decode();const start=performance.now(),result=window.__focusPersonDetector.detect(image);
+    return{width:image.naturalWidth,height:image.naturalHeight,elapsedMs:performance.now()-start,persons:result.detections.map(d=>({box:d.boundingBox,categories:d.categories.map(c=>({index:c.index,name:c.categoryName,score:c.score}))}))};
+   })()`);
+   report.rows.push({file:f.file,inputSha256:f.sha256,...row});continue;
+  }
+  const row=await evaluate(`(async()=>{
+   const {analyzeFaces}=await import('/src/services/localFaceAI.js'),{measureNativeSubjectFocus}=await import('/src/services/subjectFocusMeasurement.js');
+   const image=new Image();image.src=${JSON.stringify('/__focus-fixture/'+f.file)};await image.decode();
+   const start=performance.now(),face=await analyzeFaces(image);let facts=null;
+   if(${f.file.endsWith('-crop.png')}){const c=document.createElement('canvas');c.width=image.naturalWidth;c.height=image.naturalHeight;const x=c.getContext('2d',{willReadFrequently:true});x.drawImage(image,0,0);facts=measureNativeSubjectFocus(x.getImageData(0,0,c.width,c.height).data,c.width,c.height);c.width=c.height=1;}
+   return{width:image.naturalWidth,height:image.naturalHeight,elapsedMs:performance.now()-start,face,facts};
+  })()`);
+  check(row.face.available===true,'EXISTING_FACE_RUNTIME_UNAVAILABLE');report.rows.push({file:f.file,inputSha256:f.sha256,...row});
+  fs.writeFileSync(path.join(evidence,'SUBJECT_FOCUS_PROBE.json'),JSON.stringify(report,null,2));
+ }
+ report.nativeCases=[];
+ for(const c of nativeInputs.cases){
+  const row=await evaluate(`(async()=>{
+   const c=${JSON.stringify(c)};
+   const {measureNativeSubjectFocus}=await import('/src/services/subjectFocusMeasurement.js');
+   const {SUBJECT_FOCUS_SCHEMA,SUBJECT_FOCUS_RULE,SUBJECT_PERSON_MODEL_SHA256,subjectFocusPatchBounds,classifySubjectFocusEvidence}=await import('/src/services/subjectFocusPolicy.js');
+   const proposal={schemaVersion:SUBJECT_FOCUS_SCHEMA,ruleVersion:SUBJECT_FOCUS_RULE,modelSha256:SUBJECT_PERSON_MODEL_SHA256,coordinateSpace:'oriented-original-normalized',rect:c.proposalRect,detectionScore:c.detectionScore,inputWidth:c.overviewWidth,inputHeight:c.overviewHeight};
+   const bounds=subjectFocusPatchBounds(proposal,c.width,c.height);if(bounds.length!==3)throw Error('NATIVE_BOUNDS_NOT_ELIGIBLE');
+   const patches=[];for(let i=0;i<3;i++){const f=c.files[i],b=bounds[i];if(['role','left','top','width','height'].some(k=>f[k]!==b[k]))throw Error('NATIVE_BOUNDS_MISMATCH');const image=new Image();image.src='/__native-patch/'+f.file;await image.decode();if(image.naturalWidth!==b.width||image.naturalHeight!==b.height)throw Error('NATIVE_PIXEL_DIMENSIONS');const canvas=document.createElement('canvas');canvas.width=b.width;canvas.height=b.height;const x=canvas.getContext('2d',{willReadFrequently:true});x.drawImage(image,0,0);patches.push({...b,facts:measureNativeSubjectFocus(x.getImageData(0,0,b.width,b.height).data,b.width,b.height)});canvas.width=canvas.height=1;}
+   const evidence={schemaVersion:SUBJECT_FOCUS_SCHEMA,ruleVersion:SUBJECT_FOCUS_RULE,sourceKind:'original-jpeg',nativePixels:true,orientationApplied:true,modelSha256:SUBJECT_PERSON_MODEL_SHA256,width:c.width,height:c.height,proposal,patches};
+   const controlledNomination={technical:{inferenceSource:'sidecar-onnxruntime',defectProbabilities:{blur:.99}}};
+   return {case:c.case,sourceSha256:c.sourceSha256,evidence,classification:classifySubjectFocusEvidence(evidence,controlledNomination),nomination:'Controlled high-blur nomination for component test; not current full_ai inference'};
+  })()`);
+  report.nativeCases.push(row);
+ }
+ report.testScope='Native region classifier component plus alternate licensed model localization; not whole-original E2E';
+ fs.writeFileSync(path.join(evidence,'SUBJECT_FOCUS_PROBE.json'),JSON.stringify(report,null,2));
+ check(report.nativeCases.find(r=>r.case==='R2-08').classification?.kind==='severe-subject-softness-original','HUMAN_SEVERE_HOLDOUT_NOT_CLASSIFIED');
+ check(report.nativeCases.find(r=>r.case==='R2-04').classification===null,'HUMAN_USABLE_HOLDOUT_NOT_PROTECTED');
+ report.status='PASS_NATIVE_PATCH_RULE_AND_ALTERNATE_MODEL_ONLY';
+ report.limitations=bodyProbe
+  ? ['Isolated candidate person localization only; candidate not integrated or distributed','Existing anonymous overviews/crops only; no new originals','Detection boxes do not prove main subject intent, focus loss or recoverability','Windows native-crop facts are separate from body localization; passed Mac crop measurements are not repeated']
+  : ['Source renderer and existing face model only; not a shipped installer acceptance','Overview geometry and provided native crop measured separately; no whole-original rejection claimed','Face landmarks are proposals, not proof of main subject, identity, or recoverability','Human-confirmed samples are holdout only; no learned weights trained'];
+}catch(e){report.status='FAIL';report.error=String(e.stack??e);}
+finally{
+ if(ws?.readyState===WebSocket.OPEN){try{await Promise.race([call('Browser.close').catch(()=>null),delay(5000)]);}catch{}}
+ if(app?.pid){for(let n=0;n<40&&app.exitCode===null&&app.signalCode===null;n++)await delay(100);if(app.exitCode===null&&app.signalCode===null){if(process.platform==='win32')await new Promise(resolve=>{const p=spawn('taskkill',['/PID',String(app.pid),'/T','/F'],{stdio:'ignore'});p.on('exit',resolve);p.on('error',resolve);});else{try{process.kill(-app.pid,'SIGTERM');}catch{}for(let n=0;n<30&&app.exitCode===null&&app.signalCode===null;n++)await delay(100);if(app.exitCode===null&&app.signalCode===null)try{process.kill(-app.pid,'SIGKILL');}catch{}}}}
+ for(const p of pending.values()){clearTimeout(p.t);p.reject(Error('PROBE_FINISHED'));}pending.clear();try{ws?.close();}catch{}await server?.close();
+ fs.writeFileSync(path.join(evidence,'SUBJECT_FOCUS_PROBE.json'),JSON.stringify(report,null,2));fs.closeSync(log);
+}
+if(report.status==='FAIL')process.exitCode=1;

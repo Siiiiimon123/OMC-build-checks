@@ -1,0 +1,14 @@
+{
+  "schema": "omc-aes256gcm-build-transport-v1",
+  "assets": [
+    {
+      "id": "native-subject-patches",
+      "plaintextBytes": 1659902,
+      "plaintextSha256": "4a38075655a05e3002a3011975bc7bd059e7db35856d4547258f9c04aad1a017",
+      "ciphertextBytes": 1659902,
+      "nonceHex": "468cc55c5767847f186cdcf3",
+      "ciphertextSha256": "e5349272d0e96c93beaefe0b4bb723e50f7af05eb37594e2237d0f645e502bff",
+      "tagHex": "75cced5fa090898b36f785d8a9ac78bb"
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-name: R37 native subject focus workflow candidate; no release
+name: R38 native-pixel holdout component and licensed model comparison
 'on':
   push:
     branches: ['verify-optimization20']
@@ -29,7 +29,7 @@ jobs:
           PYTHONDONTWRITEBYTECODE: '1'
           OMC_R20_SOURCE_GUARDS_ONLY: '1'
           OMC_R35_SUBJECT_FOCUS: '1'
-          OMC_R37_SUBJECT_WORKER: '1'
+          OMC_R38_NATIVE_PATCHES: '1'
           OMC_R36_BODY_PROBE: '1'
         run: python opt20/run-cloud.py
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
