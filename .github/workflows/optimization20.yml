@@ -24,7 +24,7 @@ jobs:
           OMC_PREVIEW15_TRANSPORT_KEY: '${{ secrets.OMC_PREVIEW15_TRANSPORT_KEY }}'
           GH_TOKEN: '${{ github.token }}'
           PYTHONDONTWRITEBYTECODE: '1'
-        run: python final21/run-mac-policy-probe.py
+        run: python final21/run-mac-policy-models-only.py
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         if: always()
         with:
