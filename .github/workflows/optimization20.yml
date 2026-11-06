@@ -1,4 +1,4 @@
-name: Current Preview20 native packaging and installed full-AI acceptance
+name: Frozen Preview20 normal UI thousand-photo project endurance
 'on':
   push:
     branches: ['verify-optimization20']
@@ -24,7 +24,7 @@ jobs:
         with: {python-version: '${{ matrix.python }}', architecture: '${{ matrix.arch }}', check-latest: false}
       - name: Validate controller syntax before dependency downloads
         run: python final19/run-final-package-cloud.py --preflight
-      - name: Install frozen Windows20, native shortcut, full AI and real JPEG export
+      - name: Install exact accepted Windows20 and test normal UI import AI persistence with 1000 assets
         env:
           OMC_PREVIEW15_TRANSPORT_KEY: '${{ secrets.OMC_PREVIEW15_TRANSPORT_KEY }}'
           PYTHONDONTWRITEBYTECODE: '1'

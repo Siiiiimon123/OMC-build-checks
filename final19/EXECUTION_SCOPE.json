@@ -1,5 +1,5 @@
 {
-  "schema": "omc-current-package20-bounded-execution-v1",
+  "schema": "omc-frozen-package-normal-project-endurance-v1",
   "baselineSourceTree": "31b79bac263eef3e2c32e9fabe8537f8d77401be",
   "cloudDispatchApproved": true,
   "feeUSD": 0,
@@ -28,5 +28,15 @@
   "productRebuilt": false,
   "macRebuiltOrRetested": false,
   "frozenInstallerSha256": "5a03299cfa376dc26d516cf726356208b255657c72011504528752eb43ce0346",
-  "previousStop": "Old QA branch guard before installation"
+  "previousStop": null,
+  "previousInstalledAcceptanceRun": 42215184147,
+  "onlyNewCase": "Normal native project: import, automatic actual AI, save, actual restart",
+  "originalPhotoCount": 2,
+  "generatedAssetCount": 998,
+  "generatedFixtureBytesMax": 268435456,
+  "distinctRealThousandNotQualified": true,
+  "noDirectAnalysisPost": true,
+  "previousEditingExportNotRepeated": true,
+  "humanLabelsRecovered": false,
+  "oldHumanRecordSearchStopped": true
 }

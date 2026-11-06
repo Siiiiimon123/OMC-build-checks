@@ -226,23 +226,8 @@ def main():
             installed = installation['executable']
             result['firstInstallPayloadPassed'] = True
             result['shortcutBindingPassed'] = installation['shortcutBindingPassed']
-            # Native Unicode shortcut verification is followed by fresh full
-            # AI/edit/export acceptance of this exact current package. Never
-            # inherit the old Preview19 full-AI result for new package bytes.
-            run('actual-native-unicode-shortcut-launch', ['node', HERE / 'cloud-shortcut-launch.mjs',
-                evidence / 'FIRST_INSTALL.json', WORK / 'shortcut-launch', evidence], timeout=300)
-            native = json.loads((evidence / 'ACTUAL_DESKTOP_SHORTCUT_LAUNCH.json').read_bytes())
-            assert native['status'] == 'PASS_ACTUAL_UNICODE_DESKTOP_SHORTCUT_LAUNCH_AND_NATIVE_LINK_READ'
-            assert native['originalShortcutUnchanged'] is True and native['normalExitVerified'] is True
-            result['shortcutBindingPassed'] = True
-            if os.environ.get('OMC_SHORTCUT_DIAGNOSTIC') == '1':
-                for log in Path(os.environ['TEMP']).glob('omc-preview16-shortcut-*.log'):
-                    shutil.copyfile(log, evidence / log.name)
-                run('isolated-shortcut-differential', ['node', HERE / 'cloud-shortcut-probe.cjs',
-                    source, inputs, WORK / 'shortcut-probe', evidence], timeout=600)
-                result['status'] = 'DIAGNOSTIC_COMPLETE_NOT_RELEASE'
-                success = True
-                return 0
+            result['shortcutRetested'] = False
+            result['priorShortcutAcceptanceRun'] = 42215184147
         elif sys.platform == 'win32':
             # A new build alone requires model transport; acceptance reuses the frozen installer.
             fetch_exact('fetch-existing-model-transport', HERE / 'RESOURCE_TRANSPORT.json', 'base', WORK / 'base.tar')
@@ -277,21 +262,18 @@ def main():
             import plistlib
             executable = plistlib.loads(plist.read_bytes())['CFBundleExecutable']
             installed = str(Path(built['installedApp']) / 'Contents/MacOS' / executable)
-        # Validate the installed package with the same reviewed real-photo and
-        # synthetic-group flow, including full byte-bound AI responses.
-        for identity in ('synthetic', 'sample-a', 'sample-b'):
-            test = WORK / ('installed-' + identity)
-            test.mkdir()
-            argv = ['node', HERE / 'cloud-final-installed.mjs', source, test,
-                    '' if identity == 'synthetic' else WORK / (identity + '.jpg'), installed]
-            run('installed-' + identity, argv, source, timeout=900)
-            shutil.copytree(test / 'evidence', evidence / ('installed-' + identity))
-        result.update(status='PASS_FINAL_PACKAGE_FIRST_INSTALL_FULL_AI_JPEG_GROUP_EXPORT',
+        assert acceptance_only and sys.platform == 'win32'
+        test = WORK / 'installed-endurance'
+        test.mkdir()
+        run('installed-normal-project-1000', ['node', HERE / 'cloud-project-endurance.mjs',
+            source, test, WORK / 'sample-a.jpg', WORK / 'sample-b.jpg', installed], source, timeout=2700)
+        endurance = json.loads((test / 'evidence/PROJECT_ENDURANCE.json').read_bytes())
+        assert endurance['status'] == 'PASS_INSTALLED_NORMAL_PROJECT_1000_IMPORT_AI_RESTART'
+        shutil.copytree(test / 'evidence', evidence / 'installed-endurance')
+        result.update(status=endurance['status'], normalProjectThousandPassed=True,
             package={'bytes': package.stat().st_size, 'sha256': sha(package), 'name': package.name},
-            firstInstallPassed=True, fullAiFunctionalPassed=True, installedRealJpegPassed=True)
-        if acceptance_only and result['shortcutBindingPassed'] is not True:
-            result['firstInstallPassed'] = False
-            raise AssertionError('WINDOWS_DESKTOP_SHORTCUT_BINDING_NOT_VERIFIED')
+            distinctRealThousandQualified=False, recognitionAccuracyQualified=False,
+            previousInstalledComponentsAcceptanceRun=42215184147)
         success = True
     except Exception as exc:
         result.update(status='FAIL', error=type(exc).__name__ + ': ' + str(exc))
@@ -326,7 +308,7 @@ if __name__ == '__main__':
         for file in HERE.glob('*.py'):
             ast.parse(file.read_text(encoding='utf8'), filename=str(file))
         for name in ('cloud-final-windows-build.cjs', 'cloud-final-installed.mjs',
-                     'cloud-final-flow.mjs', 'cloud-shortcut-probe.cjs', 'cloud-shortcut-launch.mjs', 'transport.cjs', 'bootstrap.cjs', 'contracts.cjs'):
+                     'cloud-final-flow.mjs', 'cloud-project-endurance.mjs', 'cloud-shortcut-probe.cjs', 'cloud-shortcut-launch.mjs', 'transport.cjs', 'bootstrap.cjs', 'contracts.cjs'):
             file = HERE / name
             assert file.is_file(), 'WORKFLOW_INPUT_MISSING:' + name
             subprocess.run(['node', '--check', str(file)], check=True, timeout=30)
