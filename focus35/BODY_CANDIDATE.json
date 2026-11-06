@@ -1,0 +1,9 @@
+{
+  "url": "https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite0/int8/1/efficientdet_lite0.tflite?generation=1682636013497226",
+  "bytes": 4602795,
+  "generation": "1682636013497226",
+  "md5Base64": "zr9kr2w15avXNElGhQZIQg==",
+  "scope": "Isolated candidate on already approved anonymous overviews; not product distribution",
+  "source": "https://developers.google.com/edge/mediapipe/solutions/vision/object_detector",
+  "weightDistributionLicense": "Pending exact asset provenance/notice verification; no distribution authorized by this probe"
+}

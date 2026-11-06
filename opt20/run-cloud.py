@@ -198,6 +198,7 @@ try:
                 assert set(z.namelist())=={'INPUTS.json','R2-04-overview.jpg','R2-04-crop.png','R2-08-overview.jpg','R2-08-crop.png'}
                 assert sum(i.file_size for i in z.infolist())<=2*1024**2
                 z.extractall(fixture_root)
+            shutil.copyfile(scoped/'BODY_CANDIDATE.json',fixture_root/'BODY_CANDIDATE.json')
             child_env.pop('ELECTRON_SKIP_BINARY_DOWNLOAD',None)
             checks.append(stage('electron-runtime',['node','node_modules/electron/install.js'],source,timeout=300))
             if all(checks):
@@ -402,6 +403,8 @@ finally:
             'platform':sys.platform,'stages':stages,'memberPhotosUsed':os.environ.get('OMC_R20_NATIVE_UI')=='1',
             'realThousandPhotoQualified':False,'gpuPerformanceQualified':False,
             'installerBuilt':False,'published':False}
+    if os.environ.get('OMC_R35_SUBJECT_FOCUS')=='1':
+        result.update(memberPhotosUsed=True,anonymousDerivativesUsed=True,fullOriginalsUploadedByThisRun=False)
     if os.environ.get('OMC_R20_ENGINE_BASELINE')=='1':
         result['status']='PASS_IMMUTABLE_ENGINE_BASELINE_NOT_CURRENT_PRODUCT' if ok else 'FAIL_IMMUTABLE_ENGINE_BASELINE'
         result['engineBaselineOnly']=True

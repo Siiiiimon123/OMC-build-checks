@@ -15,6 +15,8 @@ const evidence=path.join(work,'evidence');fs.mkdirSync(evidence,{recursive:true}
 const report={schema:'omc-existing-face-native-focus-probe-v1',status:'RUNNING',platform:process.platform,
  images:'Only four previously shown anonymized overview/native crop files; no new full originals',
  newModelAdded:false,automaticRejectionTested:false,installedPackageTested:false,rows:[]};
+const bodyProbe=process.env.OMC_R36_BODY_PROBE==='1';
+if(bodyProbe){report.schema='omc-isolated-person-candidate-probe-v1';report.newModelAdded=true;report.candidateModelTested=true;report.candidateIntegratedIntoProduct=false;}
 const log=fs.openSync(path.join(evidence,'source-app.log'),'a');let app,server,ws,seq=0;const pending=new Map();
 const env={...process.env};for(const k of Object.keys(env))if(/^(OMC_|GH_TOKEN|GITHUB_TOKEN|ELECTRON_RUN_AS_NODE)/.test(k))delete env[k];
 function call(method,params={}){return new Promise((resolve,reject)=>{const id=++seq,t=setTimeout(()=>{pending.delete(id);reject(Error('CDP_TIMEOUT:'+method));},120000);pending.set(id,{resolve,reject,t});ws.send(JSON.stringify({id,method,params}));});}
@@ -27,6 +29,7 @@ try{
  const contract=JSON.parse(fs.readFileSync(path.join(source,'contracts/frontend-face-runtime-v1.json'),'utf8'));
  const assets=[];
  for(const row of contract.assets){
+  if(bodyProbe&&row.path.endsWith('.task'))continue;
   const p=row.path.endsWith('.task')?path.join(work,'face_landmarker.task'):path.join(source,'node_modules/@mediapipe/tasks-vision/wasm',path.basename(row.path));
   if(row.path.endsWith('.task')){
    // Exactly the model URL and expected bytes already used by the native Mac builder.
@@ -40,6 +43,17 @@ try{
   assets.push({path:row.path,bytes:bytes.length,sha256:hash(bytes)});
  }
  report.assets=assets;
+ if(bodyProbe){
+  const config=JSON.parse(fs.readFileSync(path.join(inputs,'BODY_CANDIDATE.json'),'utf8'));
+  check(config.bytes===4602795&&config.generation==='1682636013497226','FROZEN_PUBLIC_CANDIDATE');
+  const response=await fetch(config.url,{signal:AbortSignal.timeout(90000)});check(response.ok,'PERSON_CANDIDATE_HTTP');
+  const chunks=[];let n=0;for await(const c of response.body){n+=c.length;check(n<=config.bytes,'PERSON_CANDIDATE_LIMIT');chunks.push(c);}
+  const bytes=Buffer.concat(chunks);check(n===config.bytes&&createHash('md5').update(bytes).digest('base64')===config.md5Base64,'PUBLISHED_PERSON_CANDIDATE_IDENTITY');
+  const p=path.join(work,'person-candidate.tflite');fs.writeFileSync(p,bytes,{flag:'wx'});
+  routes.set('/models/subject-person-candidate.tflite',{path:p,type:'application/octet-stream'});
+  report.candidateModel={bytes:n,sha256:hash(bytes),url:config.url,provider:'CPU',
+   embeddedLicenseHints:(bytes.toString('latin1').match(/[\x20-\x7e]{12,}/g)??[]).filter(s=>/apache|licen[cs]e|tensorflow\.org/i.test(s)).slice(0,12)};
+ }
  const vite=await import(pathToFileURL(require.resolve('vite')).href),{createServer}=vite.default??vite;
  server=await createServer({root:source,logLevel:'error',server:{host:'127.0.0.1',port:5173,strictPort:true},plugins:[{name:'owned-focus-fixtures',configureServer(s){s.middlewares.use((req,res,next)=>{const p=new URL(req.url,'http://localhost').pathname,row=routes.get(p);if(!row)return next();const b=fs.readFileSync(row.path);res.setHeader('Content-Type',row.type);res.setHeader('Content-Length',b.length);res.end(b);});}}]});await server.listen();
  const profile=path.join(work,'profile'),binary=process.platform==='win32'?'node_modules/electron/dist/electron.exe':'node_modules/electron/dist/Electron.app/Contents/MacOS/Electron';
@@ -47,7 +61,20 @@ try{
  let target;for(let n=0;n<200;n++){try{const port=Number(fs.readFileSync(path.join(profile,'DevToolsActivePort'),'utf8').split('\n')[0]);target=(await(await fetch('http://127.0.0.1:'+port+'/json/list')).json()).find(p=>p.type==='page'&&p.url.startsWith('http://localhost:5173'));if(target)break;}catch{}await delay(250);}check(target,'SOURCE_RENDERER_NOT_READY');
  ws=new WebSocket(target.webSocketDebuggerUrl);await new Promise((r,j)=>{const t=setTimeout(()=>j(Error('CDP_OPEN')),10000);ws.addEventListener('open',()=>{clearTimeout(t);r();},{once:true});ws.addEventListener('error',()=>{clearTimeout(t);j(Error('CDP_OPEN'));},{once:true});});
  ws.addEventListener('message',e=>{const m=JSON.parse(e.data),p=pending.get(m.id);if(p){pending.delete(m.id);clearTimeout(p.t);m.error?p.reject(Error(JSON.stringify(m.error))):p.resolve(m.result);}});await call('Runtime.enable');
- for(const f of fixtures.files){
+ for(const f of fixtures.files.filter(f=>!bodyProbe||f.file.endsWith('-overview.jpg')||process.platform==='win32')){
+  if(bodyProbe){
+   if(f.file.endsWith('-crop.png')){
+    const row=await evaluate(`(async()=>{const {measureNativeSubjectFocus}=await import('/src/services/subjectFocusMeasurement.js');const image=new Image();image.src=${JSON.stringify('/__focus-fixture/'+f.file)};await image.decode();const c=document.createElement('canvas');c.width=image.naturalWidth;c.height=image.naturalHeight;const x=c.getContext('2d',{willReadFrequently:true});x.drawImage(image,0,0);const facts=measureNativeSubjectFocus(x.getImageData(0,0,c.width,c.height).data,c.width,c.height);c.width=c.height=1;return{width:image.naturalWidth,height:image.naturalHeight,facts};})()`);
+    report.rows.push({file:f.file,inputSha256:f.sha256,...row});continue;
+   }
+   const row=await evaluate(`(async()=>{
+    const {FilesetResolver,ObjectDetector}=await import('/node_modules/@mediapipe/tasks-vision/vision_bundle.mjs');
+    if(!window.__focusPersonDetector){const files=await FilesetResolver.forVisionTasks('/mediapipe/wasm');window.__focusPersonDetector=await ObjectDetector.createFromOptions(files,{baseOptions:{modelAssetPath:'/models/subject-person-candidate.tflite',delegate:'CPU'},runningMode:'IMAGE',scoreThreshold:.35,maxResults:32,categoryAllowlist:['person']});}
+    const image=new Image();image.src=${JSON.stringify('/__focus-fixture/'+f.file)};await image.decode();const start=performance.now(),result=window.__focusPersonDetector.detect(image);
+    return{width:image.naturalWidth,height:image.naturalHeight,elapsedMs:performance.now()-start,persons:result.detections.map(d=>({box:d.boundingBox,categories:d.categories.map(c=>({index:c.index,name:c.categoryName,score:c.score}))}))};
+   })()`);
+   report.rows.push({file:f.file,inputSha256:f.sha256,...row});continue;
+  }
   const row=await evaluate(`(async()=>{
    const {analyzeFaces}=await import('/src/services/localFaceAI.js'),{measureNativeSubjectFocus}=await import('/src/services/subjectFocusMeasurement.js');
    const image=new Image();image.src=${JSON.stringify('/__focus-fixture/'+f.file)};await image.decode();
@@ -59,7 +86,9 @@ try{
   fs.writeFileSync(path.join(evidence,'SUBJECT_FOCUS_PROBE.json'),JSON.stringify(report,null,2));
  }
  report.status='PASS_PROBE_EXECUTED_NOT_AUTOMATIC_REJECTION';
- report.limitations=['Source renderer and existing face model only; not a shipped installer acceptance','Overview geometry and provided native crop measured separately; no whole-original rejection claimed','Face landmarks are proposals, not proof of main subject, identity, or recoverability','Human-confirmed samples are holdout only; no learned weights trained'];
+ report.limitations=bodyProbe
+  ? ['Isolated candidate person localization only; candidate not integrated or distributed','Existing anonymous overviews/crops only; no new originals','Detection boxes do not prove main subject intent, focus loss or recoverability','Windows native-crop facts are separate from body localization; passed Mac crop measurements are not repeated']
+  : ['Source renderer and existing face model only; not a shipped installer acceptance','Overview geometry and provided native crop measured separately; no whole-original rejection claimed','Face landmarks are proposals, not proof of main subject, identity, or recoverability','Human-confirmed samples are holdout only; no learned weights trained'];
 }catch(e){report.status='FAIL';report.error=String(e.stack??e);}
 finally{
  if(ws?.readyState===WebSocket.OPEN){try{await Promise.race([call('Browser.close').catch(()=>null),delay(5000)]);}catch{}}
