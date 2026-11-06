@@ -1,0 +1,14 @@
+{
+  "schema": "omc-aes256gcm-build-transport-v1",
+  "assets": [
+    {
+      "id": "mac-policy-role-guard",
+      "plaintextBytes": 72250,
+      "plaintextSha256": "8e40ad7c8d15d1d16b39c7c31e02141d72e7bc05d588c4e80d53d013952a9ef2",
+      "ciphertextBytes": 72250,
+      "nonceHex": "9da655b7658d7d1798f510ee",
+      "ciphertextSha256": "ef4ad1e078aea260b306df517112449aa0e1b230de6149e886678e76609f605c",
+      "tagHex": "fbc0cd6e08a51a0a2ca7cd9ed468377d"
+    }
+  ]
+}
