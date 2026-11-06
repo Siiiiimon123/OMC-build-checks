@@ -1,12 +1,12 @@
 {
   "schema": "omc-one-independent-network-diagnostic-v1",
   "executeAuthorized": true,
-  "status": "AUTHORIZED_PREPARED_NOT_YET_RUN",
+  "status": "AUTHORIZED_SAME_SCOPE_TLS_REPAIR_PREPARED",
   "maxRuns": 1,
   "maxMinutes": 3,
   "runner": "ubuntu-24.04 standard public repository runner",
   "costLimitUSD": 0,
-  "httpRequests": 3,
+  "httpRequests": 4,
   "maxBodyBytesEach": 1024,
   "noAutomaticRerun": true,
   "repository": "Siiiiimon123/OMC-build-checks",
@@ -14,5 +14,7 @@
   "photosSourceModelsOrSecretsIncluded": false,
   "productionSettingsChanged": false,
   "contactSupportAuthorized": false,
-  "approvalId": "call_350be8a2b08b415e9b6d3355b6fd58d5"
+  "approvalId": "call_350be8a2b08b415e9b6d3355b6fd58d5",
+  "priorRunRetained": true,
+  "authorizationBasis": "Same-scope free diagnostic repairs expressly preapproved; same repo hostname source and ≤1KiB range, no config change"
 }

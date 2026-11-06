@@ -7,7 +7,7 @@ HOST='omc.xiaoa.cyou'
 TARGET='/updates/targets/releases/9eda59434c38b50085edd041dd9a7b06e2476e6a99cc0e3c3a7c353695f9703d.OMC-Photo-Select-1.0.21-preview.16-x64.exe'
 REPO='Siiiiimon123/OMC-build-checks'
 BRANCH='refs/heads/verify-cdn-origin-09'
-OUT=Path(os.environ['RUNNER_TEMP'])/'omc-cdn-origin-09'
+OUT=Path(os.environ['RUNNER_TEMP'])/'omc-cdn-origin-10'
 SAFE_HEADERS={'server','content-length','content-range','x-cache','via','x-swift-error','eagleid','x-omc-delivery'}
 assert os.environ.get('GITHUB_ACTIONS')=='true' and os.environ.get('GITHUB_REPOSITORY')==REPO
 assert os.environ.get('GITHUB_REF')==BRANCH and os.environ.get('GITHUB_RUN_ATTEMPT')=='1'
@@ -25,14 +25,14 @@ report={'schema':'omc-independent-cloud-origin-comparison-v1','runId':run,'curl'
  'network':'GitHub standard Ubuntu runner, independent of owned ECS',
  'targetVersion':'Windows16 published target; not a final release acceptance',
  'productionChanged':False,'installerBytesPersistedAsArtifact':False,'rows':[]}
-for label,ip,tls in [('origin-tls12','121.40.126.51','1.2'),('origin-tls13','121.40.126.51','1.3'),('cdn-default','58.218.208.16',None)]:
- query='omc_diag=20261105-gh09-'+run+'-'+label
+for label,ip,tls in [('origin-tls12','121.40.126.51','1.2'),('origin-tls13','121.40.126.51','1.3'),('cdn-tls12','27.128.223.158','1.2'),('cdn-tls13','27.128.223.158','1.3')]:
+ query='omc_diag=20261107-gh10-'+run+'-'+label
  url='https://'+HOST+TARGET+'?'+query
  headers=OUT/(label+'.headers');body=OUT/(label+'.body')
  cmd=['curl','--silent','--show-error','--http1.1','--proto','=https','--connect-timeout','8',
   '--max-time','15','--retry','0','--max-filesize','1024','--range','0-1023',
   '--noproxy',HOST,'--resolve',HOST+':443:'+ip,'--header','Accept-Encoding: identity',
-  '--user-agent','OMC-Bounded-Cloud-Diagnostic/09','--dump-header',str(headers),'--output',str(body),
+  '--user-agent','OMC-Bounded-Cloud-Diagnostic/10','--dump-header',str(headers),'--output',str(body),
   '--write-out','{"httpCode":"%{http_code}","remoteIp":"%{remote_ip}","sslVerifyResult":"%{ssl_verify_result}","bytes":"%{size_download}","seconds":"%{time_total}"}']
  if tls:cmd+=['--tlsv'+tls,'--tls-max',tls]
  cmd+=[url]

@@ -4,7 +4,7 @@ name: One bounded independent origin TLS comparison
     branches: ['verify-cdn-origin-09']
     paths: ['.github/workflows/cdn-origin-diagnostic.yml', 'cdn-origin-diagnostic/**']
 permissions: {contents: read}
-concurrency: {group: omc-origin-diagnostic09, cancel-in-progress: false}
+concurrency: {group: omc-origin-diagnostic10, cancel-in-progress: false}
 jobs:
   network:
     if: github.repository == 'Siiiiimon123/OMC-build-checks' && github.event.repository.private == false && github.run_attempt == 1
@@ -13,12 +13,12 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with: {persist-credentials: false, fetch-depth: 1}
-      - name: Three small validated HTTPS comparisons, no retries
+      - name: Four small validated HTTPS comparisons, no retries
         run: python3 cdn-origin-diagnostic/probe.py
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         if: always()
         with:
-          name: origin-diagnostic09-public-network-metadata
-          path: '${{ runner.temp }}/omc-cdn-origin-09/RESULT.json'
+          name: origin-diagnostic10-public-network-metadata
+          path: '${{ runner.temp }}/omc-cdn-origin-10/RESULT.json'
           retention-days: 3
           if-no-files-found: error
