@@ -1,0 +1,37 @@
+name: Mac22 exact five fixture response diagnosis without product rebuild
+'on':
+  push:
+    branches: ['verify-optimization20']
+    paths: ['mac22small/**', '.github/workflows/mac22-small-failure-diagnostic.yml']
+permissions: {contents: read, actions: read}
+jobs:
+  native-mac:
+    if: github.repository == 'Siiiiimon123/OMC-build-checks' && github.event.repository.private == false && github.run_attempt == 1
+    concurrency: {group: omc-small-failure-mac22, cancel-in-progress: false}
+    runs-on: macos-15
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with: {persist-credentials: false, fetch-depth: 1}
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with: {node-version: '24.19.0', architecture: arm64, check-latest: false, package-manager-cache: false}
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with: {python-version: '3.12.10', architecture: arm64, check-latest: false}
+      - name: Check exact control entry before model transfer
+        run: python -c "import ast,pathlib,subprocess; p=pathlib.Path('mac22small'); [ast.parse((p/n).read_text(encoding='utf8')) for n in ['run-diagnostic.py']]; [subprocess.run(['node','--check',str(f)],check=True) for f in list(p.glob('*.cjs'))+list(p.glob('*.mjs'))]"
+      - name: Capture partial failures and native abort origins, no passed phases repeated
+        env:
+          OMC_PREVIEW15_TRANSPORT_KEY: '${{ secrets.OMC_PREVIEW15_TRANSPORT_KEY }}'
+          GH_TOKEN: '${{ github.token }}'
+          PYTHONDONTWRITEBYTECODE: '1'
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: python mac22small/run-diagnostic.py
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        if: always()
+        with:
+          name: mac22-small-failure-diagnostic-encrypted-evidence
+          path: |
+            ${{ runner.temp }}/omc-small-failure-mac22/encrypted/reports.enc
+            ${{ runner.temp }}/omc-small-failure-mac22/encrypted/REPORTS_READY.json
+          retention-days: 7
+          if-no-files-found: warn
