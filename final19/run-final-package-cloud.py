@@ -206,8 +206,8 @@ def main():
             current_record = json.loads(package_inputs.read_bytes())
             current = current_record['current']
             assert current_record['baselineSourceTree'] == SOURCE_TREE
-            assert current['bytes'] == 803348413
-            assert current['sha256'] == 'daade4392f5b77262fbd1f53b4ffbcb89e73290952f1a0779739c0ff8d97eb27'
+            assert current['bytes'] == 803343050
+            assert current['sha256'] == '5a03299cfa376dc26d516cf726356208b255657c72011504528752eb43ce0346'
             package = WORK / Path(current['path']).name
             run('decrypt-exact-frozen-windows', ['node', transport, 'decrypt', '--manifest',
                 cipher / 'PACKAGE_READY.json', '--id', 'pkg', '--input', cipher / 'package.enc',
@@ -215,7 +215,7 @@ def main():
             assert package.stat().st_size == current['bytes'] and sha(package) == current['sha256']
             current['path'] = str(package)
             save(package_inputs, current_record)
-            result['acceptanceOnlyFrozenArtifact'] = 13402959173
+            result['acceptanceOnlyFrozenArtifact'] = 13500036431
             result['productRebuilt'] = False
             run('npm-ci-fixed-source', ['npm.cmd', 'ci', '--ignore-scripts', '--no-audit', '--no-fund'], source)
             run('first-install-windows', ['powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass',
@@ -226,21 +226,15 @@ def main():
             installed = installation['executable']
             result['firstInstallPayloadPassed'] = True
             result['shortcutBindingPassed'] = installation['shortcutBindingPassed']
-            if os.environ.get('OMC_SHORTCUT_LAUNCH_ONLY') == '1':
-                run('actual-native-unicode-shortcut-launch', ['node', HERE / 'cloud-shortcut-launch.mjs',
-                    evidence / 'FIRST_INSTALL.json', WORK / 'shortcut-launch', evidence], timeout=300)
-                native = json.loads((evidence / 'ACTUAL_DESKTOP_SHORTCUT_LAUNCH.json').read_bytes())
-                assert native['status'] == 'PASS_ACTUAL_UNICODE_DESKTOP_SHORTCUT_LAUNCH_AND_NATIVE_LINK_READ'
-                assert native['originalShortcutUnchanged'] is True and native['normalExitVerified'] is True
-                result.update(status='PASS_INSTALLED_NATIVE_SHORTCUT_WITH_PRIOR_UNCHANGED_PAYLOAD_FUNCTIONAL_PROOF',
-                    firstInstallPassed=True, shortcutBindingPassed=True,
-                    package={'bytes': package.stat().st_size, 'sha256': sha(package), 'name': package.name},
-                    inheritedFullAiAndJpegEvidence={'run': 42009299924, 'artifact': 13406632133,
-                        'artifactSha256': '6f85604e2145a7fa7a21dd6919688db49d2ab8429cfe00d426ecf30ce7a0024c',
-                        'sameInstallerSha256': current['sha256'], 'successfulStagesRepeated': False},
-                    firstInstallWScriptChinesePathProbeSupersededByActualNativeShellEvidence=True)
-                success = True
-                return 0
+            # Native Unicode shortcut verification is followed by fresh full
+            # AI/edit/export acceptance of this exact current package. Never
+            # inherit the old Preview19 full-AI result for new package bytes.
+            run('actual-native-unicode-shortcut-launch', ['node', HERE / 'cloud-shortcut-launch.mjs',
+                evidence / 'FIRST_INSTALL.json', WORK / 'shortcut-launch', evidence], timeout=300)
+            native = json.loads((evidence / 'ACTUAL_DESKTOP_SHORTCUT_LAUNCH.json').read_bytes())
+            assert native['status'] == 'PASS_ACTUAL_UNICODE_DESKTOP_SHORTCUT_LAUNCH_AND_NATIVE_LINK_READ'
+            assert native['originalShortcutUnchanged'] is True and native['normalExitVerified'] is True
+            result['shortcutBindingPassed'] = True
             if os.environ.get('OMC_SHORTCUT_DIAGNOSTIC') == '1':
                 for log in Path(os.environ['TEMP']).glob('omc-preview16-shortcut-*.log'):
                     shutil.copyfile(log, evidence / log.name)

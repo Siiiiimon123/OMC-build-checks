@@ -3,12 +3,12 @@
   "assets": [
     {
       "id": "final-helpers",
-      "plaintextBytes": 230702,
-      "plaintextSha256": "079208d650e29c567428d3d49dfaaaa6dbe6a7f270e0f673ec9a5f1588e2c1ea",
-      "ciphertextBytes": 230702,
-      "nonceHex": "475398b5f7be3612d7732a1e",
-      "ciphertextSha256": "eb550d9a510c33131d389dda1a809b7a9586aaed89535c3d999f6e2925326a5d",
-      "tagHex": "5ff0875231a29981d6b4b01e29d1a49b"
+      "plaintextBytes": 230726,
+      "plaintextSha256": "2b6ff49e3bfcceaee27f2634247c41efbf604538368a867d080810ce2c447cce",
+      "ciphertextBytes": 230726,
+      "nonceHex": "cdd4ca53c30332f0327f8603",
+      "ciphertextSha256": "7f6f68a2fe8fa5581f1d727ed171a52176752cc4dba49baf512852dcb0a18341",
+      "tagHex": "c52df3f72257f47d540c3df0af8e623e"
     }
   ]
 }

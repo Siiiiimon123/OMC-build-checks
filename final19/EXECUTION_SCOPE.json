@@ -6,7 +6,7 @@
   "automaticRerun": false,
   "limits": {
     "windowsMaxRuns": 1,
-    "macMaxRuns": 1,
+    "macMaxRuns": 0,
     "minutesEach": 90
   },
   "approval": "Existing same-scope free continuation; user no repeated approval for such fixes",
@@ -22,5 +22,11 @@
   "sourceChangesSinceThatRun": [
     "package.json version",
     "package-lock.json root version metadata"
-  ]
+  ],
+  "acceptanceOnly": true,
+  "immutableWindowsArtifact": 13500036431,
+  "productRebuilt": false,
+  "macRebuiltOrRetested": false,
+  "frozenInstallerSha256": "5a03299cfa376dc26d516cf726356208b255657c72011504528752eb43ce0346",
+  "previousStop": "Old QA branch guard before installation"
 }

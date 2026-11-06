@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
 const [installationFile,work,evidence]=process.argv.slice(2);
 assert(process.platform==='win32'&&process.env.GITHUB_ACTIONS==='true'&&process.env.GITHUB_REPOSITORY==='Siiiiimon123/OMC-build-checks');
-assert(process.env.GITHUB_REF==='refs/heads/verify-final-package19'&&process.env.GITHUB_RUN_ATTEMPT==='1');
+assert(process.env.GITHUB_REF==='refs/heads/verify-optimization20'&&process.env.GITHUB_RUN_ATTEMPT==='1');
 const json=p=>JSON.parse(fs.readFileSync(p,'utf8').replace(/^\ufeff/,''));
 const installed=json(installationFile),raw=json(path.join(evidence,'DESKTOP_LINK_INVENTORY.json'));
 const rows=Array.isArray(raw)?raw:[raw],links=rows.filter(r=>r.name.startsWith('OMC')&&r.name.endsWith('.lnk'));
