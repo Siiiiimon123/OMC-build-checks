@@ -14,7 +14,8 @@ def child(model,mode,out):
     assert platform.machine()=='arm64' and sys.platform=='darwin'
     options=ort.SessionOptions();options.graph_optimization_level=ort.GraphOptimizationLevel.ORT_ENABLE_ALL
     if mode.startswith('cpu-'):options.intra_op_num_threads=int(mode.split('-')[1])
-    providers=[('CoreMLExecutionProvider',{'flags':'18'}),'CPUExecutionProvider'] if mode=='coreml-18' else ['CPUExecutionProvider']
+    if mode=='coreml-3':options.intra_op_num_threads=3
+    providers=[('CoreMLExecutionProvider',{'flags':'18'}),'CPUExecutionProvider'] if mode.startswith('coreml-') else ['CPUExecutionProvider']
     start=time.perf_counter();session=ort.InferenceSession(str(model),sess_options=options,providers=providers)
     initialize=(time.perf_counter()-start)*1000
     expected=providers[0][0] if isinstance(providers[0],tuple) else providers[0]
@@ -50,17 +51,17 @@ def main(app,identity_file,out_dir):
         assert digest(model.with_name(entry['externalName']))==entry['externalSha256']
         rows=[]
         # Alternating which provider is first reduces a simple ordering confound.
-        modes=['coreml-18','cpu-0','cpu-1','cpu-3'] if len(results)%2==0 else ['cpu-0','coreml-18','cpu-3','cpu-1']
+        modes=['coreml-18','coreml-3','cpu-3'] if len(results)%2==0 else ['cpu-3','coreml-3','coreml-18']
         for mode in modes:
             destination=out/(entry['role']+'-'+mode+'.json')
             with (out/(entry['role']+'-'+mode+'.log')).open('xb') as log:
                 subprocess.run([sys.executable,__file__,'child',str(model),mode,str(destination)],check=True,stdout=log,stderr=subprocess.STDOUT,timeout=180)
             rows.append(json.loads(destination.read_bytes()))
-        reference=next(r for r in rows if r['mode']=='cpu-0')
+        reference=next(r for r in rows if r['mode']=='cpu-3')
         reference_outputs=reference['outputs']
         for row in rows:
             assert row['inputs']==reference['inputs'] and row['outputShapes']==reference['outputShapes']
-            row['maxAbsoluteDifferenceFromCpu']=max(abs(a-b) for a1,b1 in zip(row.pop('outputs'),reference_outputs) for a,b in zip(a1,b1))
+            row['maxAbsoluteDifferenceFromCpu3']=max(abs(a-b) for a1,b1 in zip(row.pop('outputs'),reference_outputs) for a,b in zip(a1,b1))
         results[entry['role']]={'modelSha256':entry['sha256'],'externalSha256':entry['externalSha256'],'comparisons':rows}
         save(out/'PROVIDER_COMPARISON.json',{'status':'PARTIAL','roles':results})
     save(out/'PROVIDER_COMPARISON.json',{'status':'PASS_BOUNDED_MODEL_LATENCY_MEASUREMENT','roles':results,
