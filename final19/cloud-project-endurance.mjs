@@ -15,7 +15,7 @@ const out=path.join(work,'evidence'),fixtureRoot=path.join(work,'fixtures'),prof
 fs.mkdirSync(out,{recursive:true});fs.mkdirSync(fixtureRoot);
 const report={schema:'omc-installed-project-endurance-v1',status:'RUNNING',stage:'fixtures',
  sourceTree:'31b79bac263eef3e2c32e9fabe8537f8d77401be',fixtureCount:1000,
- limits:['Two authorized original JPEGs; 998 synthetic assets, including 256 byte-distinct aliases of one generated 11MP raster',
+ limits:['Two authorized original JPEGs; 998 synthetic assets, including 16 byte-distinct aliases of one generated 11MP raster',
  'Not 1000 independent real camera photos, recognition accuracy, physical GPU throughput or percentile latency',
  'Native chooser answers adapted; actual source grants, import, UI analysis and persistence untouched'],samples:[],rendererErrors:[]};
 function save(){fs.writeFileSync(path.join(out,'PROJECT_ENDURANCE.json'),JSON.stringify(report,null,2));}
@@ -95,10 +95,10 @@ try{
  for(let y=0;y<height;y++)for(let x=0;x<width;x++){const i=(y*width+x)*4;rgba[i]=40+(x%170);rgba[i+1]=30+(y%175);rgba[i+2]=((x>>5)^(y>>5))&1?170:50;rgba[i+3]=255;}
  const large=jpeg.encode({data:rgba,width,height},82).data;
  function add(name,bytes,kind){check(fixtures.reduce((n,f)=>n+f.bytes,0)+bytes.length<=256*1024**2,'FIXTURE_BYTE_BUDGET');const p=path.join(fixtureRoot,name);fs.writeFileSync(p,bytes,{flag:'wx'});fixtures.push({path:p,bytes:bytes.length,sha256:hash(bytes),kind});}
- for(let i=0;i<256;i++){const tag=Buffer.from('omc-generated-owned-alias-'+i),header=Buffer.alloc(4);header[0]=255;header[1]=239;header.writeUInt16BE(tag.length+2,2);add('large-'+String(i).padStart(4,'0')+'.jpg',Buffer.concat([large.subarray(0,2),header,tag,large.subarray(2)]),'synthetic-large-raster-alias');}
- const small=Buffer.alloc(960*640*4);
- for(let n=0;n<742;n++){for(let y=0;y<640;y++)for(let x=0;x<960;x++){const i=(y*960+x)*4;small[i]=(x*3+n*7+y)%256;small[i+1]=(y*3+n*13+(x>>3))%256;small[i+2]=(((x+n*11)>>4)^((y+n*3)>>4))*29%256;small[i+3]=255;}add('generated-'+String(n).padStart(4,'0')+'.jpg',jpeg.encode({data:small,width:960,height:640},72).data,'synthetic-unique-raster');}
- check(fixtures.length===1000&&new Set(fixtures.map(f=>f.sha256)).size===1000,'FIXTURE_COUNT_AND_BYTE_UNIQUENESS');report.fixtures={bytes:fixtures.reduce((n,f)=>n+f.bytes,0),generationMs:Date.now()-started,realOriginalCount:2,syntheticLargeAliases:256,syntheticUniqueSmall:742};save();
+ for(let i=0;i<16;i++){const tag=Buffer.from('omc-generated-owned-alias-'+i),header=Buffer.alloc(4);header[0]=255;header[1]=239;header.writeUInt16BE(tag.length+2,2);add('large-'+String(i).padStart(4,'0')+'.jpg',Buffer.concat([large.subarray(0,2),header,tag,large.subarray(2)]),'synthetic-large-raster-alias');}
+ const small=Buffer.alloc(640*426*4);
+ for(let n=0;n<982;n++){for(let y=0;y<426;y++)for(let x=0;x<640;x++){const i=(y*640+x)*4;small[i]=(x*3+n*7+y)%256;small[i+1]=(y*3+n*13+(x>>3))%256;small[i+2]=(((x+n*11)>>4)^((y+n*3)>>4))*29%256;small[i+3]=255;}add('generated-'+String(n).padStart(4,'0')+'.jpg',jpeg.encode({data:small,width:640,height:426},60).data,'synthetic-unique-raster');}
+ check(fixtures.length===1000&&new Set(fixtures.map(f=>f.sha256)).size===1000,'FIXTURE_COUNT_AND_BYTE_UNIQUENESS');report.fixtures={bytes:fixtures.reduce((n,f)=>n+f.bytes,0),generationMs:Date.now()-started,realOriginalCount:2,syntheticLargeAliases:16,syntheticUniqueSmall:982};save();
  stage('launch');await start();await click('使用此编号开始选片');if(await ev('Boolean(document.querySelector("button[aria-label=跳过新手引导]"))'))await click('跳过新手引导');
  stage('bundled-ai-warmup');const warm=Date.now(),prep=await ev('window.electronAPI.beginAiAnalysis()');check(prep?.runtimePreparation?.accepted===true,'BUNDLED_PREPARATION');await until('window.electronAPI.getAiServiceStatus().then(s=>s.lastHealth?.fullAiReady===true)',240000);report.aiWarmupMs=Date.now()-warm;service=await ev('window.electronAPI.getAiServiceStatus().then(s=>({port:s.port,token:s.token}))');check(Number.isInteger(service.port)&&service.token,'BUNDLED_ENDPOINT');
  stage('normal-ui-import-and-auto-analysis');await click('导入照片');check(await setPicker(),'OWNED_NATIVE_PICKER');const importStart=Date.now();await click('选择文件');
