@@ -1,0 +1,23 @@
+[
+  {
+    "role": "vision",
+    "name": "clip_vision.onnx",
+    "sha256": "5e7f4bed5850d83066d1dd812a7d31cc2597d5aea90090b16411f0cb264d4ee6",
+    "externalName": "clip_vision.onnx.data",
+    "externalSha256": "04ada8fe1125ce75c4629e0eaf047ec7ea0e5f43e2a518e52ba5343cea8c41c4"
+  },
+  {
+    "role": "technical",
+    "name": "waste-filter-v1.onnx",
+    "sha256": "b04157855cfe8cf798e89282bdb3ed631d5ca05945240c7c888bab7168f53238",
+    "externalName": "waste-filter-v1.onnx.data",
+    "externalSha256": "f08bd0d3e97445cd3a079a105802e84a0bd94b163de6659e9f4b4068b97e21e3"
+  },
+  {
+    "role": "reference",
+    "name": "topiq-nr-spaq-256.onnx",
+    "sha256": "831349bfa4e98c550b9742bc7018112b9b4c574a587c8b21c277558e99dc0a01",
+    "externalName": "topiq-nr-spaq-256.onnx.data",
+    "externalSha256": "4cca0ad322a037603767526e7cb5e70c2327c4ff0c916015ad2a1cfe9d5f5536"
+  }
+]

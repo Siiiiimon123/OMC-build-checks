@@ -1,0 +1,36 @@
+name: Mac22 batch-shape latency diagnostic, no product changes
+'on':
+  push:
+    branches: ['verify-optimization20']
+    paths: ['mac22batch/**', '.github/workflows/mac22-batch-diagnostic.yml']
+permissions: {contents: read, actions: read}
+jobs:
+  diagnostic:
+    if: github.repository == 'Siiiiimon123/OMC-build-checks' && github.event.repository.private == false && github.run_attempt == 1
+    concurrency: {group: 'omc-provider22-batch' , cancel-in-progress: false}
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with: {persist-credentials: false, fetch-depth: 1}
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with: {node-version: '24.19.0', architecture: arm64, check-latest: false, package-manager-cache: false}
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with: {python-version: '3.12.10', architecture: arm64, check-latest: false}
+      - name: Parse the bounded diagnostic before download
+        run: python -c "import ast,pathlib; [ast.parse(pathlib.Path('mac22batch',p).read_text(encoding='utf8')) for p in ['mac-provider-probe.py','run-mac-provider-probe.py']]"
+      - name: Compare fixed models without changing product
+        env:
+          OMC_PREVIEW15_TRANSPORT_KEY: '${{ secrets.OMC_PREVIEW15_TRANSPORT_KEY }}'
+          GH_TOKEN: '${{ github.token }}'
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: python mac22batch/run-mac-provider-probe.py
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        if: always()
+        with:
+          name: mac22-batch-provider-diagnostic-encrypted-evidence
+          path: |
+            ${{ runner.temp }}/omc-provider22batch/encrypted/reports.enc
+            ${{ runner.temp }}/omc-provider22batch/encrypted/REPORTS_READY.json
+          retention-days: 7
+          if-no-files-found: warn
