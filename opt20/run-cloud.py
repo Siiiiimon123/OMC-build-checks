@@ -59,6 +59,8 @@ try:
                 raise RuntimeError('INVALID_SOURCE_ARCHIVE')
         z.extractall(source)
     (WORK/'baseline-imageAnalyzer.js').write_bytes((source/'src/services/imageAnalyzer.js').read_bytes())
+    if os.environ.get('OMC_R26_SATURATION_KERNEL')=='1':
+        (WORK/'baseline-jpegSaturation.mjs').write_bytes((source/'src/services/jpegSaturation.js').read_bytes())
     if (HERE/'overlay.enc').exists():
         overlay=WORK/'overlay.zip'
         overlay_cipher=HERE/'overlay.enc'
@@ -116,6 +118,11 @@ try:
         raise SystemExit(0 if ok else 1)
     if os.environ.get('OMC_R20_SOURCE_GUARDS_ONLY')=='1':
         checks=[]
+        if os.environ.get('OMC_R26_SATURATION_KERNEL')=='1':
+            checks.append(stage('saturation-production-delegation-contracts',['node','--test',
+                'src/services/jpegSaturation.test.js','src/services/jpegContrast.test.js',
+                'src/services/jpegWhiteBalance.test.js','src/services/jpegTones.test.js',
+                'src/services/jpegVibranceRecipe.test.js','src/services/jpegExposurePipeline.test.js'],source))
         if os.environ.get('OMC_R25_INFERENCE_WAVE')=='1':
             checks.append(stage('inference-wave-contracts',['node','--test',
                 'src/services/ai/modelLoaderBatch.test.js'],source))
@@ -137,6 +144,19 @@ try:
         previous=source/'preview-manifest.json'
         if previous.exists():previous.rename(REPORTS/'previous-preview-manifest.json')
         checks.append(stage('build-browser-preview',[npm,'run','build:browser-preview'],source))
+        if all(checks) and os.environ.get('OMC_R26_SATURATION_KERNEL')=='1':
+            checks.append(stage('saturation-exact-rgb-and-kernel-benchmark',['node',str(HERE/'benchmark-jpeg-saturation.mjs'),
+                str(source),str(WORK/'baseline-jpegSaturation.mjs'),str(REPORTS/'SATURATION_KERNEL.json')],source,timeout=240))
+            if all(checks):
+                kernel=json.loads((REPORTS/'SATURATION_KERNEL.json').read_bytes())
+                # Public output is synthetic numeric evidence only. No source,
+                # images, paths, project IDs, EXIF or credentials are printed.
+                print(json.dumps({'syntheticKernelResult':kernel['status'],
+                    'sourceTree':expected['sourceTree'],'completeRgbColoursPerRecipe':16777216,
+                    'recipes':len(kernel['fullRgbCases']),
+                    'byteAndDiagnosticEquality':all(r['bytesEqual'] and r['diagnosticsEqual'] for r in kernel['fullRgbCases']),
+                    'abbaKernelSpeedups':[r['kernelSpeedup'] for r in kernel['benchmark']],
+                    'notGuiOrFullAi':True}),flush=True)
         if all(checks) and os.environ.get('OMC_R21_INCREMENTAL')=='1' and os.name=='nt':
             child_env.pop('ELECTRON_SKIP_BINARY_DOWNLOAD',None)
             checks.append(stage('electron-runtime',['node','node_modules/electron/install.js'],source,timeout=300))
