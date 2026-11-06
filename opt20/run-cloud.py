@@ -143,6 +143,12 @@ try:
         raise SystemExit(0 if ok else 1)
     if os.environ.get('OMC_R20_SOURCE_GUARDS_ONLY')=='1':
         checks=[]
+        if os.environ.get('OMC_R34_TECHNICAL_REFERENCE')=='1':
+            checks.append(stage('technical-reference-and-decision-boundaries',['node','--test',
+                'src/services/ai/technicalWasteEvaluator.test.js',
+                'src/services/ai/technicalWasteDecisionProtection.test.js',
+                'src/services/ai/wasteDecisionPolicy.test.js',
+                'src/services/conservativeAutomaticReview.test.js'],source))
         if os.environ.get('OMC_R26_SATURATION_KERNEL')=='1':
             checks.append(stage('saturation-production-delegation-contracts',['node','--test',
                 'src/services/jpegSaturation.test.js','src/services/jpegContrast.test.js',
@@ -169,6 +175,9 @@ try:
         previous=source/'preview-manifest.json'
         if previous.exists():previous.rename(REPORTS/'previous-preview-manifest.json')
         checks.append(stage('build-browser-preview',[npm,'run','build:browser-preview'],source))
+        if all(checks) and os.environ.get('OMC_R34_TECHNICAL_REFERENCE')=='1':
+            checks.append(stage('actual-react-risk-reference-render',['node',str(HERE/'cloud-technical-reference.mjs'),
+                str(source),str(REPORTS/'TECHNICAL_REFERENCE_RENDER.json')],source,timeout=180))
         if all(checks) and os.environ.get('OMC_R26_SATURATION_KERNEL')=='1':
             checks.append(stage('saturation-exact-rgb-and-kernel-benchmark',['node',str(HERE/'benchmark-jpeg-saturation.mjs'),
                 str(source),str(WORK/'baseline-jpegSaturation.mjs'),str(REPORTS/'SATURATION_KERNEL.json')],source,timeout=240))

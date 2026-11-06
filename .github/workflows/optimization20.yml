@@ -1,44 +1,41 @@
-name: Frozen Preview20 normal UI thousand-photo project endurance
+name: R34 technical defect review reference and actual React rendering
 'on':
   push:
     branches: ['verify-optimization20']
-    paths: ['.github/workflows/optimization20.yml', 'final19/**', 'opt20/**']
+    paths: ['.github/workflows/optimization20.yml', 'opt20/**']
 permissions: {contents: read, actions: read}
 jobs:
-  native:
+  regression:
     if: github.repository == 'Siiiiimon123/OMC-build-checks' && github.event.repository.private == false && github.run_attempt == 1
     strategy:
       fail-fast: false
       matrix:
         include:
-          - {os: windows-2025, arch: x64, python: '3.14.5'}
-    concurrency: {group: 'omc-final-package20-${{ matrix.os }}', cancel-in-progress: false}
+          - {os: windows-2025, arch: x64}
+          - {os: macos-15, arch: arm64}
+    concurrency: {group: 'omc-risk-reference-${{ matrix.os }}', cancel-in-progress: false}
     runs-on: '${{ matrix.os }}'
-    timeout-minutes: 90
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with: {persist-credentials: false, fetch-depth: 1}
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with: {node-version: '24.19.0', architecture: '${{ matrix.arch }}', check-latest: false, package-manager-cache: false}
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
-        with: {python-version: '${{ matrix.python }}', architecture: '${{ matrix.arch }}', check-latest: false}
-      - name: Validate controller syntax before dependency downloads
-        run: python final19/run-final-package-cloud.py --preflight
-      - name: Install exact accepted Windows20 and test normal UI import AI persistence with 1000 assets
+        with: {python-version: '3.12.10', architecture: '${{ matrix.arch }}', check-latest: false}
+      - name: Source guards and actual React risk reference
         env:
           OMC_PREVIEW15_TRANSPORT_KEY: '${{ secrets.OMC_PREVIEW15_TRANSPORT_KEY }}'
           PYTHONDONTWRITEBYTECODE: '1'
-          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-          OMC_ACCEPT_EXISTING_WINDOWS: '1'
-          OMC_SHORTCUT_LAUNCH_ONLY: '0'
-          GH_TOKEN: '${{ github.token }}'
-        run: python final19/run-final-package-cloud.py
+          OMC_R20_SOURCE_GUARDS_ONLY: '1'
+          OMC_R34_TECHNICAL_REFERENCE: '1'
+        run: python opt20/run-cloud.py
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         if: always()
         with:
-          name: 'final20-${{ matrix.os }}-encrypted-evidence'
+          name: 'optimization20-${{ matrix.os }}-encrypted-evidence'
           path: |
-            ${{ runner.temp }}/omc-final-package20/encrypted/reports.enc
-            ${{ runner.temp }}/omc-final-package20/encrypted/REPORTS_READY.json
+            ${{ runner.temp }}/omc-optimization-r20/encrypted/reports.enc
+            ${{ runner.temp }}/omc-optimization-r20/encrypted/REPORTS_READY.json
           retention-days: 7
           if-no-files-found: warn
