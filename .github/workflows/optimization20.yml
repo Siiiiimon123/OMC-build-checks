@@ -1,4 +1,4 @@
-name: Frozen Preview21 thousand import AI and automatic review regression
+name: Frozen Preview21 mixed thousand and native subject automatic review regression
 'on':
   push:
     branches: ['verify-optimization20']
