@@ -91,7 +91,7 @@ try:
                    for p in source.rglob('*') if p.is_file()], key=lambda x: x[0])
     digest = hashlib.sha256(json.dumps(rows, ensure_ascii=False, separators=(',', ':')).encode('utf-8')).hexdigest()
     expected = json.loads((HERE / 'engine-baseline-input.json').read_bytes())
-    if expected['sourceTree'] != 'b4142fc30632ad6d3eb7ab9f5f07ad7622ab5f28' or len(rows) != 935 or digest != 'e8830ee61ddacc245bc9cde7e45b5bc1436cd9b6766df8b42ff9069093a5fd78':
+    if expected['sourceTree'] != 'c1211e63d60ffff22bfdd4275ae4a84ffca82dee' or len(rows) != 935 or digest != 'a0427d54f1718bdc2886fe4f00842b219413d7f6486924cfc25d796229d50cc7':
         raise RuntimeError('FROZEN_SOURCE_IDENTITY')
     (REPORTS / 'FROZEN_INPUTS.json').write_text(json.dumps({**expected,
         'verifiedSourcePathSha256Digest': digest, 'controlCommit': os.environ.get('GITHUB_SHA'),
@@ -142,6 +142,16 @@ try:
     stage('native-continuous-and-switch-gap', ['node', str(HERE / 'cloud-jpeg-timing.mjs'), str(source), str(case), *map(str, fixtures)], source, 420)
     result = json.loads((case / 'evidence/JPEG_RACE.json').read_bytes())
     status = result['status']
+    if not status.startswith('FAIL'):
+        # These components changed in this source: cover the real modal group
+        # editor and finished JPEG path with the existing generated near-pair.
+        # No held/injected worker result or earlier neutral-display matrix.
+        env.update({'OMC_R20_TIMING_ONLY':'0','OMC_R20_FINISHED_FLOW':'0',
+                    'OMC_R20_FAST_DISPLAY':'0','OMC_R20_VIEWPORT':'compact'})
+        finished_case = REPORTS / 'native-synthetic'
+        finished_case.mkdir()
+        stage('source-modal-group-and-finished-export', ['node',str(HERE / 'cloud-finished-run.mjs'),
+            str(source),str(finished_case)], source, 600)
 except Exception:
     status = 'FAIL_SOURCE_JPEG_GAP'
     (REPORTS / 'controller-error.log').write_text(traceback.format_exc(), encoding='utf-8')
@@ -173,7 +183,7 @@ finally:
             'persistentExportStatusVerified':finished.get('persistentExportStatusVerified')
         }}),flush=True)
     (REPORTS / 'SUMMARY.json').write_text(json.dumps({'status': status, 'platform': sys.platform,
-        'stages': stages, 'sourceTree': 'b4142fc30632ad6d3eb7ab9f5f07ad7622ab5f28',
+        'stages': stages, 'sourceTree': 'c1211e63d60ffff22bfdd4275ae4a84ffca82dee',
         'memberPhotos': ['sample-a', 'sample-b'], 'scriptDrivenRealGui': True,
         'installedPackageTested': False, 'completeAiTested': False, 'realThousandTested': False,
         'published': False}), encoding='utf-8')
