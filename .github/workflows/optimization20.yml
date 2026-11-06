@@ -1,4 +1,4 @@
-name: Preview21 incremental packages and installed subject restoration
+name: Frozen Preview21 group edit and finished export
 'on':
   push:
     branches: ['verify-optimization20']
@@ -12,9 +12,10 @@ jobs:
       matrix:
         include:
           - {os: windows-2025, arch: x64}
+          - {os: macos-15, arch: arm64}
     concurrency: {group: 'omc-delivery21-${{ matrix.os }}', cancel-in-progress: false}
     runs-on: '${{ matrix.os }}'
-    timeout-minutes: 90
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with: {persist-credentials: false, fetch-depth: 1}
@@ -24,28 +25,19 @@ jobs:
         with: {python-version: '3.12.10', architecture: '${{ matrix.arch }}', check-latest: false}
       - name: Parse exact controls before downloads
         run: python -c "import ast,pathlib,subprocess; p=pathlib.Path('final21'); [ast.parse(f.read_text(encoding='utf8')) for f in p.glob('*.py')]; [subprocess.run(['node','--check',str(f)],check=True) for f in list(p.glob('*.cjs'))+list(p.glob('*.mjs'))]"
-      - name: Incremental build, first install and real workflows
+      - name: Same finished package, real group editor and finished export
         env:
           OMC_PREVIEW15_TRANSPORT_KEY: '${{ secrets.OMC_PREVIEW15_TRANSPORT_KEY }}'
           GH_TOKEN: '${{ github.token }}'
           PYTHONDONTWRITEBYTECODE: '1'
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-        run: python final21/run-incremental21.py
+        run: python final21/run-frozen21-groups.py
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         if: always()
         with:
-          name: 'final21-${{ matrix.os }}-encrypted-evidence'
+          name: 'follow21-${{ matrix.os }}-encrypted-evidence'
           path: |
-            ${{ runner.temp }}/omc-incremental21/encrypted/reports.enc
-            ${{ runner.temp }}/omc-incremental21/encrypted/REPORTS_READY.json
-          retention-days: 7
-          if-no-files-found: warn
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
-        if: always()
-        with:
-          name: 'final21-${{ matrix.os }}-encrypted-package'
-          path: |
-            ${{ runner.temp }}/omc-incremental21/encrypted/package.enc
-            ${{ runner.temp }}/omc-incremental21/encrypted/PACKAGE_READY.json
+            ${{ runner.temp }}/omc-followup21/encrypted/reports.enc
+            ${{ runner.temp }}/omc-followup21/encrypted/REPORTS_READY.json
           retention-days: 7
           if-no-files-found: warn

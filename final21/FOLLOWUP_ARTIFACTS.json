@@ -1,0 +1,19 @@
+{
+  "windows": {
+    "id": 13523823651,
+    "bytes": 806703885,
+    "sha256": "1c81315b819836b0de29112a08ee95b1e7ec94735817b86d844e651b89722258",
+    "plainBytes": 806457221,
+    "plainSha256": "9dc4195d811683ae66c8b3ca452b16e5d47b0b3c045eda339bc01817e0096a3a",
+    "acceptedInstalledRun": 42263730451
+  },
+  "mac": {
+    "id": 13526504342,
+    "bytes": 992016611,
+    "sha256": "f8997dfcffaeb4a1e9214946cb8d4e39601b216770300156728a0f9c1425e33d",
+    "plainBytes": 991713413,
+    "plainSha256": "61e4c5a5fa01622bff2f8c3ab4d37136ceda1fdef3ede684eddfea1327cc9ef0",
+    "asarSha256": "bdf5be0ba8953c901e8774c8bea13dc3a6cd3f0e6da61b6bb65fc89f3ab51d1a",
+    "acceptedInstalledRun": 42263022046
+  }
+}
