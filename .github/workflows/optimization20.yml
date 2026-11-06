@@ -1,9 +1,9 @@
-name: Mac22 native current backend and installed member workflows
+name: Mac22 same native package installed workflows completion
 'on':
   push:
     branches: ['verify-optimization20']
     paths: ['mac22/**', '.github/workflows/optimization20.yml']
-permissions: {contents: read}
+permissions: {contents: read, actions: read}
 jobs:
   native-mac:
     if: github.repository == 'Siiiiimon123/OMC-build-checks' && github.event.repository.private == false && github.run_attempt == 1
@@ -18,28 +18,20 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
         with: {python-version: '3.12.10', architecture: arm64, check-latest: false}
       - name: Check exact control entry before model transfer
-        run: python -c "import ast,pathlib,subprocess; p=pathlib.Path('mac22'); [ast.parse((p/n).read_text(encoding='utf8')) for n in ['run-native-mac22.py','cloud-native-mac22.py']]; [subprocess.run(['node','--check',str(f)],check=True) for f in list(p.glob('*.cjs'))+list(p.glob('*.mjs'))]"
-      - name: Native build first install full AI editor export and thousand
+        run: python -c "import ast,pathlib,subprocess; p=pathlib.Path('mac22'); [ast.parse((p/n).read_text(encoding='utf8')) for n in ['run-installed-mac22.py']]; [subprocess.run(['node','--check',str(f)],check=True) for f in list(p.glob('*.cjs'))+list(p.glob('*.mjs'))]"
+      - name: Exact same package first install full AI editor export and thousand
         env:
           OMC_PREVIEW15_TRANSPORT_KEY: '${{ secrets.OMC_PREVIEW15_TRANSPORT_KEY }}'
+          GH_TOKEN: '${{ github.token }}'
           PYTHONDONTWRITEBYTECODE: '1'
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-        run: python mac22/run-native-mac22.py
+        run: python mac22/run-installed-mac22.py
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         if: always()
         with:
-          name: mac22-native-encrypted-evidence
+          name: mac22-installed-encrypted-evidence
           path: |
-            ${{ runner.temp }}/omc-native-mac22/encrypted/reports.enc
-            ${{ runner.temp }}/omc-native-mac22/encrypted/REPORTS_READY.json
-          retention-days: 7
-          if-no-files-found: warn
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
-        if: always()
-        with:
-          name: mac22-native-encrypted-package
-          path: |
-            ${{ runner.temp }}/omc-native-mac22/encrypted/package.enc
-            ${{ runner.temp }}/omc-native-mac22/encrypted/PACKAGE_READY.json
+            ${{ runner.temp }}/omc-accept-mac22/encrypted/reports.enc
+            ${{ runner.temp }}/omc-accept-mac22/encrypted/REPORTS_READY.json
           retention-days: 7
           if-no-files-found: warn
