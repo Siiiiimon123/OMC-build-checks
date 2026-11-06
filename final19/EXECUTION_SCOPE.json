@@ -1,5 +1,5 @@
 {
-  "schema": "omc-frozen-package-normal-project-endurance-v1",
+  "schema": "omc-current-package20-bounded-execution-v1",
   "baselineSourceTree": "31b79bac263eef3e2c32e9fabe8537f8d77401be",
   "cloudDispatchApproved": true,
   "feeUSD": 0,
@@ -38,5 +38,6 @@
   "noDirectAnalysisPost": true,
   "previousEditingExportNotRepeated": true,
   "humanLabelsRecovered": false,
-  "oldHumanRecordSearchStopped": true
+  "oldHumanRecordSearchStopped": true,
+  "caseSchema": "omc-frozen-package-normal-project-endurance-v1"
 }
