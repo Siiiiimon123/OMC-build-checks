@@ -79,7 +79,7 @@ def main():
         installed_app=Path('/Applications/OMC-Preview.app');assert not installed_app.exists()
         run('install-exact-native22-package',['sudo','/usr/sbin/installer','-pkg',package,'-target','/'],timeout=600)
         run('verify-installed-signature',['/usr/bin/codesign','--verify','--deep','--strict',installed_app])
-        run('verify-installed-entry',['node',HERE/'verify-mac-entry.cjs',source,installed_app,'a29daa7c76b52f32bcbe73b6cc1c432172421a902b6b902eef6e863b2757dca8',evidence/'MAC_APP_ENTRY.json'],cwd=source)
+        run('verify-installed-entry',['node',HERE/'verify-mac-entry.cjs',source,installed_app,'e35e8d2ad286665998fbce1bb06a3b9d631800d676f2c2c5557bacfc5fd5c941',evidence/'MAC_APP_ENTRY.json'],cwd=source)
         installed=installed_app/'Contents/MacOS/OMC-Preview';assert installed.is_file()
         built={'derivedSourceTree':'e262198357fb9071fb93560c3f43a185d210c892'}
         save(evidence/'EXACT_NATIVE_BUILD_REUSE.json',{'sourceTree':spec['sourceTree'],'buildRun':42294003221,'buildControl':'8fa65eb19f1efd11cedf6f360d6664f812c098fd','nativeBuildAndPayloadReadbackAndFirstInstallPassed':True,'newPackageBuilt':False,'packageBytes':package.stat().st_size,'packageSha256':sha(package),'derivedSourceTree':built['derivedSourceTree']})
