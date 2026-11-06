@@ -1,0 +1,14 @@
+{
+  "schema": "omc-aes256gcm-build-transport-v1",
+  "assets": [
+    {
+      "id": "native23-install",
+      "plaintextBytes": 141810,
+      "plaintextSha256": "8ec1036ca890a58045d36d2b9f8db2fd29fdecb4af1c10e5d50f84bfae2f62e8",
+      "ciphertextBytes": 141810,
+      "nonceHex": "9e2b43a9c44dad3a13b5e9d0",
+      "ciphertextSha256": "e4314d6aa0ef6563413eae8abcde513c35a1204f22c6d9e9c116892438fb4e58",
+      "tagHex": "d395515f00f5e4aac4c2a7f7f0be596f"
+    }
+  ]
+}
