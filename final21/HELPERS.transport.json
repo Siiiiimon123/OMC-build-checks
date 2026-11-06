@@ -3,12 +3,12 @@
   "assets": [
     {
       "id": "final21-repair",
-      "plaintextBytes": 310781,
-      "plaintextSha256": "ba0b075c3e90220815d8347dcaf827ce7292b26f9612099d82064338fa9b3cb9",
-      "ciphertextBytes": 310781,
-      "nonceHex": "77a17298c5fbb94b2a6d6e2d",
-      "ciphertextSha256": "cd46a04684d804e360fc586ff1435c5e379fdf5bf9173b6e62f153f03b85eae4",
-      "tagHex": "34cb61d66913f145bc124cf3c7339623"
+      "plaintextBytes": 310685,
+      "plaintextSha256": "ef3df2c15d5af56e318ecf18c63ddebe49c45894786bb593b511c7a43bd89c83",
+      "ciphertextBytes": 310685,
+      "nonceHex": "f54b5cdda48286febe6fe6c3",
+      "ciphertextSha256": "168a2d71131329d07d461c0e3f214506a09d9b1ff0b8cd6ea6dbcc0e609d875d",
+      "tagHex": "fdbbfdcc8a0b52238f6f4f4cf22919bb"
     }
   ]
 }
