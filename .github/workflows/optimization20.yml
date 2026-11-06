@@ -1,4 +1,4 @@
-name: Current source core/browser/build without desktop environment
+name: Current exact source browser build completion only
 'on':
   push:
     branches: ['verify-optimization20']
@@ -17,12 +17,12 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
         with: {python-version: '3.12.10', architecture: x64, check-latest: false}
       - name: Parse control before use
-        run: python -c "import ast,pathlib;ast.parse(pathlib.Path('final21/run-source-current.py').read_text(encoding='utf8'))"
+        run: python -c "import ast,pathlib;ast.parse(pathlib.Path('final21/run-source-build-only.py').read_text(encoding='utf8'))"
       - name: Verify encrypted source and run regression contracts
         env:
           OMC_PREVIEW15_TRANSPORT_KEY: '${{ secrets.OMC_PREVIEW15_TRANSPORT_KEY }}'
           PYTHONDONTWRITEBYTECODE: '1'
-        run: python final21/run-source-current.py
+        run: python final21/run-source-build-only.py
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         if: always()
         with:
