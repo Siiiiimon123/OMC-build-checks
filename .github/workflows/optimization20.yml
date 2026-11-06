@@ -1,4 +1,4 @@
-name: R28 displayed JPEG save readiness and group export
+name: R29 exact saturation encoding cache and CPU timing
 'on':
   push:
     branches: ['verify-optimization20']
@@ -23,12 +23,28 @@ jobs:
         with: {node-version: '24.19.0', architecture: '${{ matrix.arch }}', check-latest: false, package-manager-cache: false}
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
         with: {python-version: '3.12.10', architecture: '${{ matrix.arch }}', check-latest: false}
-      - name: Frozen source and authorized JPEG GUI gap only
+      - name: Product regression without rebuilding installed runtimes
         env:
           OMC_PREVIEW15_TRANSPORT_KEY: '${{ secrets.OMC_PREVIEW15_TRANSPORT_KEY }}'
           PYTHONDONTWRITEBYTECODE: '1'
-          OMC_JPEG_RACE_REPAIR_ONLY: '1'
-        run: python opt20/run-jpeg-race.py
+          OMC_R20_NATIVE_UI: '0'
+          OMC_R20_ENGINE_BASELINE: '0'
+          OMC_R20_CHANGED_BATCHER: '0'
+          OMC_R20_SOURCE_GUARDS_ONLY: '1'
+          OMC_R20_COMMIT_WAVE: '0'
+          OMC_R21_INCREMENTAL: '0'
+          OMC_R22_NEUTRAL_DISPLAY: '0'
+          OMC_R23_TECHNICAL_AND_PREVIEW: '0'
+          OMC_R24_ANALYSIS_YIELD: '0'
+          OMC_R24_NATIVE_YIELD_ONLY: '0'
+          OMC_R25_INFERENCE_WAVE: '0'
+          OMC_R26_SATURATION_KERNEL: '1'
+          OMC_R27_SVG_PROBE_ONLY: '0'
+          OMC_R20_TIMING_ONLY: '1'
+          OMC_R20_FAST_DISPLAY: '1'
+          OMC_R20_FINISHED_FLOW: '0'
+          GH_TOKEN: '${{ github.token }}'
+        run: python opt20/run-cloud.py
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         if: always()
         with:
