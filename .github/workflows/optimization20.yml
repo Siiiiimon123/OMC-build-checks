@@ -12,7 +12,6 @@ jobs:
       matrix:
         include:
           - {os: windows-2025, arch: x64}
-          - {os: macos-15, arch: arm64}
     concurrency: {group: 'omc-delivery21-${{ matrix.os }}', cancel-in-progress: false}
     runs-on: '${{ matrix.os }}'
     timeout-minutes: 90

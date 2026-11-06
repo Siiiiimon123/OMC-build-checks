@@ -106,9 +106,13 @@ def main():
                 'packageSha256':sha(package),'packageArtifact':base_info['id']})
             install_input=inputs/'PACKAGE_INPUTS.json';save(install_input,built)
             run('pristine-current-windows-install',['powershell.exe','-NoProfile','-ExecutionPolicy','Bypass','-File',inputs/'Install-FinalWindows.ps1','-InputsPath',install_input,'-OutputPath',evidence/'FIRST_INSTALL.json'],timeout=600)
-            installed_info=json.loads((evidence/'FIRST_INSTALL.json').read_text(encoding='utf-8-sig'));assert installed_info['shortcutBindingPassed'] is True
+            installed_info=json.loads((evidence/'FIRST_INSTALL.json').read_text(encoding='utf-8-sig'));assert installed_info['installedPayloadPassed'] is True
             installed=installed_info['executable']
-            run('actual-desktop-shortcut-launch',['node',HERE.parent/'final19/cloud-shortcut-launch.mjs',evidence/'FIRST_INSTALL.json',WORK/'shortcut',evidence],source,300)
+            run('actual-desktop-shortcut-launch',['node',HERE/'cloud-shortcut-launch.mjs',evidence/'FIRST_INSTALL.json',WORK/'shortcut',evidence],source,300)
+            native=json.loads((evidence/'ACTUAL_DESKTOP_SHORTCUT_LAUNCH.json').read_bytes())
+            assert native['status']=='PASS_ACTUAL_UNICODE_DESKTOP_SHORTCUT_LAUNCH_AND_NATIVE_LINK_READ'
+            assert native['originalShortcutUnchanged'] is True and native['normalExitVerified'] is True
+            result['shortcutBindingPassed']=True
         else:
             shutil.copyfile(inputs/'pkg_contract_adapter.py',HERE/'pkg_contract_adapter.py')
             run('build-install-current-mac',[sys.executable,HERE/'build-mac21.py',source,base,inputs,WORK/'build'],source,1800)
