@@ -1,10 +1,8 @@
 {
-  "sourceTree": "53ac164d777a28c7c9547dbd4d0d955b17508115",
-  "sourceFiles": 935,
-  "sourcePathSha256Digest": "86359d9f24fdef35ea4df4e402fcb3f01c3d2020be7080100a4836835d466b93",
+  "sourceTree": "f2d468c240a0c5b73fdf5176f382327b6b706138",
+  "sourceFiles": 937,
+  "sourcePathSha256Digest": "82b7ab7006994cd7dd9583c60fbf9e078384ecdf53a8a04f737c82b0279a4fb9",
   "currentProductQualified": false,
-  "realPhotos": false,
-  "memberData": false,
   "sourceArchiveIncludesModelsOrRuntime": false,
   "installedPackageTested": false
 }

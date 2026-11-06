@@ -1,0 +1,14 @@
+{
+  "schema": "omc-aes256gcm-build-transport-v1",
+  "assets": [
+    {
+      "id": "subject-focus-fixtures",
+      "plaintextBytes": 1251617,
+      "plaintextSha256": "929e6619b81eb2a955d80016cc13db1d16f5ac2e6dcf1c3c68cb0fdc5b7174b4",
+      "ciphertextBytes": 1251617,
+      "nonceHex": "d5b6930be29d124bc1938348",
+      "ciphertextSha256": "527d62a331de2494a42fd6d2d863db30fbb14f4c16514b617c8c7de5ea8cdb25",
+      "tagHex": "a03e53c846b78abb94b70a938bc67e42"
+    }
+  ]
+}

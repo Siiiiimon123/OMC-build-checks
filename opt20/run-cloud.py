@@ -143,6 +143,10 @@ try:
         raise SystemExit(0 if ok else 1)
     if os.environ.get('OMC_R20_SOURCE_GUARDS_ONLY')=='1':
         checks=[]
+        if os.environ.get('OMC_R35_SUBJECT_FOCUS')=='1':
+            checks.append(stage('native-focus-facts-and-proposals',['node','--test',
+                'src/services/subjectFocusMeasurement.test.js',
+                'src/services/conservativeAutomaticReview.test.js'],source))
         if os.environ.get('OMC_R34_TECHNICAL_REFERENCE')=='1':
             checks.append(stage('technical-reference-and-decision-boundaries',['node','--test',
                 'src/services/ai/technicalWasteEvaluator.test.js',
@@ -175,6 +179,31 @@ try:
         previous=source/'preview-manifest.json'
         if previous.exists():previous.rename(REPORTS/'previous-preview-manifest.json')
         checks.append(stage('build-browser-preview',[npm,'run','build:browser-preview'],source))
+        if all(checks) and os.environ.get('OMC_R35_SUBJECT_FOCUS')=='1':
+            scoped=HERE.parent/'focus35'
+            manifest=json.loads((scoped/'FIXTURES.transport.json').read_bytes())
+            a=manifest['assets'][0]
+            assert a['id']=='subject-focus-fixtures' and a['ciphertextBytes']<=2*1024**2
+            cipher=WORK/'focus-fixtures.enc'
+            with cipher.open('xb') as writer:
+                for n in range((a['ciphertextBytes']+65535)//65536):
+                    writer.write((scoped/('part%04d.enc'%n)).read_bytes())
+            assert cipher.stat().st_size==a['ciphertextBytes'] and hashlib.sha256(cipher.read_bytes()).hexdigest()==a['ciphertextSha256']
+            archive=WORK/'focus-fixtures.zip'
+            checks.append(stage('authenticate-focus-fixtures',['node',str(TRANSPORT),'decrypt',
+                '--input',str(cipher),'--manifest',str(scoped/'FIXTURES.transport.json'),
+                '--id','subject-focus-fixtures','--output',str(archive)],private_env=True))
+            fixture_root=WORK/'focus-fixtures';fixture_root.mkdir()
+            with zipfile.ZipFile(archive) as z:
+                assert set(z.namelist())=={'INPUTS.json','R2-04-overview.jpg','R2-04-crop.png','R2-08-overview.jpg','R2-08-crop.png'}
+                assert sum(i.file_size for i in z.infolist())<=2*1024**2
+                z.extractall(fixture_root)
+            child_env.pop('ELECTRON_SKIP_BINARY_DOWNLOAD',None)
+            checks.append(stage('electron-runtime',['node','node_modules/electron/install.js'],source,timeout=300))
+            if all(checks):
+                case=REPORTS/'native-focus';case.mkdir()
+                checks.append(stage('existing-face-native-focus-probe',['node',str(HERE/'cloud-subject-focus.mjs'),
+                    str(source),str(case),str(fixture_root)],source,timeout=420))
         if all(checks) and os.environ.get('OMC_R34_TECHNICAL_REFERENCE')=='1':
             checks.append(stage('actual-react-risk-reference-render',['node',str(HERE/'cloud-technical-reference.mjs'),
                 str(source),str(REPORTS/'TECHNICAL_REFERENCE_RENDER.json')],source,timeout=180))
