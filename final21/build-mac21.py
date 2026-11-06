@@ -1,0 +1,71 @@
+"""Repack the accepted Mac20 runtime with current application code on the owned VM."""
+from pathlib import Path
+import argparse,hashlib,importlib.util,json,os,plistlib,shutil,stat,subprocess,sys
+from pkg_contract_adapter import build_nonrelocatable_pkg,verify_expanded_contract,normalize_install_permissions,verify_installed_payload
+
+def sha(file):
+    with Path(file).open('rb') as stream:return hashlib.file_digest(stream,'sha256').hexdigest()
+def save(file,value):
+    with Path(file).open('x',encoding='utf8') as stream:json.dump(value,stream,indent=2);stream.write('\n')
+def inventory(root):
+    rows={}
+    for p in sorted(Path(root).rglob('*')):
+        mode=p.lstat().st_mode;name=p.relative_to(root).as_posix()
+        if stat.S_ISLNK(mode):rows[name]={'kind':'symlink','target':os.readlink(p)}
+        elif stat.S_ISREG(mode):rows[name]={'kind':'file','bytes':p.stat().st_size,'sha256':sha(p),'executeBits':mode&0o111}
+        elif stat.S_ISDIR(mode):rows[name]={'kind':'directory'}
+        else:raise AssertionError('UNEXPECTED_PAYLOAD_TYPE')
+    return rows
+def main():
+    assert sys.platform=='darwin' and os.environ.get('GITHUB_ACTIONS')=='true'
+    assert os.environ.get('GITHUB_REPOSITORY')=='Siiiiimon123/OMC-build-checks'
+    assert os.environ.get('GITHUB_REF')=='refs/heads/verify-optimization20'
+    source,base,inputs,work=map(Path,sys.argv[1:]);assert len(sys.argv)==5
+    assert not work.exists() and work.resolve().is_relative_to(Path(os.environ['RUNNER_TEMP']).resolve())
+    assert base.stat().st_size==983321647 and sha(base)=='42f45b2713f7143b4336bb87ccb89a85805eade3621b5746a025ab8bba3c9943'
+    work.mkdir();reports=work/'reports';reports.mkdir()
+    clean={k:v for k,v in os.environ.items() if k not in ('GH_TOKEN','GITHUB_TOKEN','OMC_PREVIEW15_TRANSPORT_KEY')}
+    def run(label,argv,allow_failure=False):
+        print(json.dumps({'phase':label}),flush=True)
+        with (reports/(label+'.log')).open('xb') as stream:
+            p=subprocess.run(list(map(str,argv)),stdout=stream,stderr=subprocess.STDOUT,env=clean,cwd=source,timeout=900)
+        assert p.returncode==0 or allow_failure,label+'_FAILED'
+    expanded=work/'baseline-expanded';run('expand-accepted-mac20',['/usr/sbin/pkgutil','--expand-full',base,expanded])
+    matches=[p for p in expanded.rglob('*.app') if (p/'Contents/Resources/app.asar').is_file()]
+    assert len(matches)==1 and matches[0].name=='OMC-Preview.app'
+    output=work/'output';output.mkdir();app=output/'OMC-Preview.app';matches[0].rename(app)
+    before=inventory(app)
+    run('rebuild-current-frontend',['node',Path(__file__).with_name('rebuild-mac-asar.cjs'),source,app,inputs,work,reports])
+    plist=app/'Contents/Info.plist';info=plistlib.loads(plist.read_bytes())
+    assert info['CFBundleIdentifier']=='com.omc.photo-select'
+    info['CFBundleShortVersionString']='1.0.21-preview.21';info['CFBundleVersion']='1.0.21.21'
+    frontend=json.loads((reports/'FRONTEND_REBUILD.json').read_bytes())
+    assert 'Resources/app.asar' in info['ElectronAsarIntegrity']
+    info['ElectronAsarIntegrity']['Resources/app.asar']={'algorithm':'SHA256','hash':frontend['asarHeaderSha256']}
+    plist.write_bytes(plistlib.dumps(info))
+    normalize_install_permissions(app,reports/'APP_INSTALL_PERMISSIONS.json')
+    run('sign-outer-app',['/usr/bin/codesign','--force','--sign','-','--timestamp=none',
+        '--preserve-metadata=identifier,entitlements,flags',app])
+    run('verify-current-app-signature',['/usr/bin/codesign','--verify','--deep','--strict',app])
+    after=inventory(app)
+    modified=sorted(name for name in set(before)|set(after) if before.get(name)!=after.get(name))
+    allowed={'Contents/Resources/app.asar','Contents/Info.plist','Contents/_CodeSignature/CodeResources',
+             'Contents/MacOS/'+info['CFBundleExecutable']}
+    assert set(modified)<=allowed, 'PRESERVED_RUNTIME_OR_NESTED_SIGNATURE_CHANGED'
+    save(reports/'UNCHANGED_RUNTIME_PROOF.json',{'status':'PASS','baselinePackageSha256':sha(base),
+        'allAiSourcesIdentical':True,'backendRebuilt':False,'changedOuterAppMembers':modified,
+        'allOtherPayloadMembersIdentical':True})
+    pkg=output/'OMC-Preview-1.0.21-preview.21-mac-arm64-unsigned.pkg'
+    build_nonrelocatable_pkg(app,work,pkg,run,reports)
+    expanded_final=work/'final-pkg-expanded'
+    run('expand-final-pkg',['/usr/sbin/pkgutil','--expand',pkg,expanded_final]);verify_expanded_contract(expanded_final,reports)
+    installed=Path('/Applications/OMC-Preview.app');assert not installed.exists(),'PRISTINE_VM_REQUIRED'
+    run('first-install-current-pkg',['sudo','/usr/sbin/installer','-pkg',pkg,'-target','/'])
+    verify_installed_payload(app,installed,inventory,reports)
+    run('verify-installed-app-signature',['/usr/bin/codesign','--verify','--deep','--strict',installed])
+    save(reports/'BUILD_RESULT.json',{'status':'PASS_INCREMENTAL_BUILD_AND_FIRST_INSTALL',
+        'sourceTree':'883787ae0ea60c56d348ff758fa150fb3f40007d','version':'1.0.21-preview.21',
+        'package':{'path':str(pkg),'bytes':pkg.stat().st_size,'sha256':sha(pkg)},
+        'installedApp':str(installed),'installedExecutable':str(installed/'Contents/MacOS'/info['CFBundleExecutable']),
+        'backendRebuilt':False,'notarized':False,'developerIdSigned':False,'fullAiAccepted':False})
+if __name__=='__main__':main()

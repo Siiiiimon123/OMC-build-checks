@@ -1,0 +1,154 @@
+"""Owned free VM: reuse accepted AI closure, build/install current package, test actual UI."""
+from pathlib import Path,PurePosixPath
+import ast,base64,hashlib,json,os,shutil,subprocess,sys,traceback,zipfile
+
+HERE=Path(__file__).resolve().parent
+WORK=Path(os.environ['RUNNER_TEMP'])/'omc-incremental21'
+SOURCE_TREE='883787ae0ea60c56d348ff758fa150fb3f40007d'
+def sha(file):
+    with Path(file).open('rb') as stream:return hashlib.file_digest(stream,'sha256').hexdigest()
+def save(file,value):Path(file).write_text(json.dumps(value,indent=2)+'\n',encoding='utf8')
+def unzip(file,dest,limit):
+    dest.mkdir()
+    with zipfile.ZipFile(file) as z:
+        assert len({i.filename.lower() for i in z.infolist()})==len(z.infolist())
+        assert sum(i.file_size for i in z.infolist())<=limit
+        for i in z.infolist():
+            p=PurePosixPath(i.filename);assert not p.is_absolute() and '..' not in p.parts and '\\' not in i.filename and ':' not in i.filename
+            assert not i.is_dir() and (i.external_attr>>16)&0o170000!=0o120000
+            target=dest.joinpath(*p.parts);target.parent.mkdir(parents=True,exist_ok=True);target.write_bytes(z.read(i))
+def main():
+    assert os.environ.get('GITHUB_ACTIONS')=='true' and os.environ.get('GITHUB_REPOSITORY')=='Siiiiimon123/OMC-build-checks'
+    assert os.environ.get('GITHUB_REF')=='refs/heads/verify-optimization20' and os.environ.get('GITHUB_RUN_ATTEMPT')=='1'
+    assert sys.platform in ('win32','darwin') and not WORK.exists()
+    WORK.mkdir();evidence=WORK/'evidence';evidence.mkdir();encrypted=WORK/'encrypted';encrypted.mkdir()
+    clean={k:v for k,v in os.environ.items() if k not in ('OMC_PREVIEW15_TRANSPORT_KEY','GH_TOKEN','GITHUB_TOKEN') and k.lower()!='psmodulepath'}
+    clean['ELECTRON_SKIP_BINARY_DOWNLOAD']='1';clean['PYTHONDONTWRITEBYTECODE']='1'
+    stages=[];result={'schema':'omc-incremental21-acceptance-v1','status':'RUNNING','sourceTree':SOURCE_TREE,
+        'controlCommit':os.environ['GITHUB_SHA'],'backendRebuilt':False,'published':False,'productionUpgradeTested':False}
+    package=None;ok=False;transport=WORK/'transport.cjs'
+    # Preserve the already verified bytes; Windows checkout can convert LF.
+    raw=subprocess.run(['git','show','HEAD:final19/transport.cjs'],cwd=HERE.parent,
+        stdout=subprocess.PIPE,stderr=subprocess.PIPE,check=True).stdout
+    transport.write_bytes(raw)
+    assert sha(transport)=='19f37e9f504c90cd26dc7ca9da8606af9a13154e2a9ec6f0fdd20e026d4ff90f'
+    def run(name,args,cwd=WORK,timeout=900,private=False):
+        print(json.dumps({'phase':name}),flush=True)
+        with (evidence/(name+'.log')).open('xb') as log:
+            p=subprocess.run(list(map(str,args)),cwd=cwd,env=os.environ if private else clean,stdout=log,stderr=subprocess.STDOUT,timeout=timeout)
+        stages.append({'phase':name,'exit':p.returncode});assert p.returncode==0,name+'_FAILED'
+    def decrypt(manifest,asset,cipher,output):run('decrypt-'+asset,['node',transport,'decrypt','--manifest',manifest,'--id',asset,'--input',cipher,'--output',output],private=True)
+    try:
+        current=HERE.parent/'opt20';cipher=WORK/'source.enc'
+        with cipher.open('xb') as writer:
+            for n in range(14):writer.write((current/('source.part%02d.enc'%n)).read_bytes())
+        decrypt(current/'source.transport.json','source-r20',cipher,WORK/'source.zip')
+        source=WORK/'source';unzip(WORK/'source.zip',source,16*1024**2)
+        overlay=WORK/'overlay.enc';overlay.write_bytes(base64.b64decode((current/'overlay.b64').read_bytes(),validate=True))
+        decrypt(current/'overlay.transport.json','r20-overlay',overlay,WORK/'overlay.zip')
+        with zipfile.ZipFile(WORK/'overlay.zip') as z:
+            rows=json.loads(z.read('PATCH.json'));assert len(rows)==56
+            assert set(z.namelist())=={'PATCH.json',*(r['path'] for r in rows)}
+            for r in rows:
+                p=PurePosixPath(r['path']);assert not p.is_absolute() and '..' not in p.parts and '\\' not in r['path']
+                dest=source.joinpath(*p.parts)
+                assert not dest.exists() if r['beforeSha256'] is None else sha(dest)==r['beforeSha256']
+                data=z.read(r['path']);assert hashlib.sha256(data).hexdigest()==r['sha256'];dest.parent.mkdir(parents=True,exist_ok=True);dest.write_bytes(data)
+        helper_cipher=WORK/'helpers.enc';helper_cipher.write_bytes(base64.b64decode((HERE/'helpers.b64').read_bytes(),validate=True))
+        decrypt(HERE/'HELPERS.transport.json','final21-helpers',helper_cipher,WORK/'helpers.zip')
+        inputs=WORK/'inputs';unzip(WORK/'helpers.zip',inputs,2*1024**2)
+        records=json.loads((inputs/'source19-records.json').read_bytes())
+        assert records['sourceTree']==SOURCE_TREE and len(records['records'])==945
+        assert {p.relative_to(source).as_posix() for p in source.rglob('*') if p.is_file()}=={r['path'] for r in records['records']}
+        for r in records['records']:assert sha(source/r['path'])==r['sha256']
+        if sys.platform=='win32':
+            ps="$ErrorActionPreference='Stop';Get-Command Get-FileHash,Get-CimInstance,Start-Process,ConvertFrom-Json -ErrorAction Stop|Out-Null;"
+            for f in inputs.glob('*.ps1'):
+                literal=str(f).replace("'","''")
+                ps+="$t=$null;$e=$null;[void][System.Management.Automation.Language.Parser]::ParseFile('"+literal+"',[ref]$t,[ref]$e);if($e.Count){throw ($e|Out-String)};"
+            run('native-installer-helper-preflight',['powershell.exe','-NoProfile','-Command',ps],timeout=60)
+        origin=json.loads((inputs/'runtime-origin-source.json').read_bytes());assert origin['sourceTree']=='31b79bac263eef3e2c32e9fabe8537f8d77401be'
+        old={r['path']:r['sha256'] for r in origin['records'] if r['path'].startswith('ai-training/')}
+        new={r['path']:r['sha256'] for r in records['records'] if r['path'].startswith('ai-training/')}
+        assert old==new and len(old)==133
+        save(evidence/'SOURCE_AND_AI_REUSE.json',{'sourceTree':SOURCE_TREE,'sourceFiles':945,'all133AiInputsIdentical':True,'backendOriginTree':origin['sourceTree']})
+        # Reuse exactly the two existing authorized original ciphertexts.
+        photos=HERE.parent/'jpeg19-source';photo_inputs=json.loads((photos/'INPUT.json').read_bytes())
+        for a in photo_inputs['assets']:
+            if a['id'] not in ('sample-a','sample-b'):continue
+            target=WORK/(a['id']+'.enc')
+            with target.open('xb') as writer:
+                for p in sorted((photos/'inputs'/a['id']).glob('*.enc')):writer.write(p.read_bytes())
+            assert target.stat().st_size==a['ciphertextBytes'] and sha(target)==a['ciphertextSha256']
+            meta=WORK/(a['id']+'.json');save(meta,{'schema':'omc-aes256gcm-build-transport-v1','assets':[a]})
+            decrypt(meta,a['id'],target,WORK/(a['id']+'.jpg'))
+        npm='npm.cmd' if sys.platform=='win32' else 'npm'
+        run('fixed-build-dependencies',[npm,'ci','--ignore-scripts','--no-audit','--no-fund'],source,600)
+        run('current-core-checks',[npm,'run','test:core'],source,300)
+        run('current-browser-checks',[npm,'run','test:browser-preview'],source,300)
+        # The rule-only snapshot intentionally excludes AI assets. Validate it
+        # before staging the separate desktop assets, preserving tracked bytes.
+        original_preview=source/'preview-manifest.json';saved_preview=WORK/'frozen-preview-manifest.json'
+        original_preview.rename(saved_preview)
+        try:
+            run('current-rule-only-browser-build',[npm,'run','build:browser-preview'],source,300)
+            shutil.copyfile(original_preview,evidence/'RULE_ONLY_PREVIEW_MANIFEST.json')
+        finally:
+            if original_preview.exists():original_preview.unlink()
+            saved_preview.rename(original_preview)
+        mode='windows' if sys.platform=='win32' else 'mac';base_info=json.loads((HERE/'BASE20_ARTIFACTS.json').read_bytes())[mode]
+        artifact=WORK/'base20.zip';run('fetch-accepted-package20',['node',HERE/'fetch-base20.mjs',mode,artifact],timeout=600,private=True)
+        frozen=WORK/'frozen-base';unzip(artifact,frozen,1100*1024**2)
+        assert {p.name for p in frozen.iterdir()}=={'PACKAGE_READY.json','package.enc'}
+        base=WORK/('base20.exe' if mode=='windows' else 'base20.pkg')
+        decrypt(frozen/'PACKAGE_READY.json','pkg',frozen/'package.enc',base)
+        assert base.stat().st_size==base_info['plainBytes'] and sha(base)==base_info['plainSha256']
+        # Current-run authenticated transport copies only, never originals/history.
+        artifact.unlink();(frozen/'package.enc').unlink()
+        if mode=='windows':
+            run('build-current-windows',['node',HERE/'build-windows21.cjs','--source',source,'--base',base,'--work',WORK/'build','--inputs',inputs],source,1800)
+            built=json.loads((WORK/'build/reports/PACKAGE_INPUTS.json').read_bytes());package=Path(built['current']['path'])
+            shutil.copyfile(WORK/'build/reports/FINAL_APP_MEMBERS.json',inputs/'FINAL_APP_MEMBERS.json')
+            install_input=inputs/'PACKAGE_INPUTS.json';save(install_input,built)
+            run('pristine-current-windows-install',['powershell.exe','-NoProfile','-ExecutionPolicy','Bypass','-File',inputs/'Install-FinalWindows.ps1','-InputsPath',install_input,'-OutputPath',evidence/'FIRST_INSTALL.json'],timeout=600)
+            installed_info=json.loads((evidence/'FIRST_INSTALL.json').read_text(encoding='utf-8-sig'));assert installed_info['shortcutBindingPassed'] is True
+            installed=installed_info['executable']
+            run('actual-desktop-shortcut-launch',['node',HERE.parent/'final19/cloud-shortcut-launch.mjs',evidence/'FIRST_INSTALL.json',WORK/'shortcut',evidence],source,300)
+        else:
+            shutil.copyfile(inputs/'pkg_contract_adapter.py',HERE/'pkg_contract_adapter.py')
+            run('build-install-current-mac',[sys.executable,HERE/'build-mac21.py',source,base,inputs,WORK/'build'],source,1800)
+            built=json.loads((WORK/'build/reports/BUILD_RESULT.json').read_bytes());package=Path(built['package']['path']);installed=built['installedExecutable']
+            frontend=json.loads((WORK/'build/reports/FRONTEND_REBUILD.json').read_bytes())
+            run('verify-installed-mac-entry',['node',HERE/'verify-mac-entry.cjs',source,built['installedApp'],frontend['asarSha256'],evidence/'MAC_APP_ENTRY.json'],source)
+        # Free only reproducible staging trees from this disposable VM after
+        # exact installer and installed-payload verification. Keep all reports.
+        base.unlink()
+        for rel in ('build/fullApp','build/asar-input','build/output/OMC-Preview.app','build/nonrelocatable-pkg-build/payload-root'):
+            p=WORK/rel
+            if p.exists():assert p.resolve().is_relative_to(WORK.resolve()) and not p.is_symlink();shutil.rmtree(p)
+        for rel in ('build/new-app.asar','build/current-app.asar'):
+            p=WORK/rel
+            if p.exists():assert p.is_file() and not p.is_symlink();p.unlink()
+        case=WORK/'normal-subject';case.mkdir()
+        run('installed-normal-full-ai-subject-restore',['node',HERE/'cloud-subject-workflow.mjs',source,case,WORK/'sample-a.jpg',WORK/'sample-b.jpg',installed],source,2400)
+        # Affected worker format is covered again by actual JPEG/group/export,
+        # without repeating the prior synthetic thousand-photo workload.
+        case=WORK/'installed-jpeg';case.mkdir()
+        run('installed-current-jpeg-group-export',['node',HERE/'cloud-final-installed.mjs',source,case,WORK/'sample-b.jpg',installed],source,900)
+        result.update(status='PASS_CURRENT_PACKAGE_INSTALL_AI_SUBJECT_RESTORE_JPEG_EXPORT',package={'path':package.name,'bytes':package.stat().st_size,'sha256':sha(package)},firstInstallPassed=True,normalFullAiPassed=True,subjectRestoreRestartPassed=True,jpegGroupExportPassed=True)
+        ok=True
+    except Exception as e:
+        result.update(status='FAIL',error=type(e).__name__+': '+str(e));(evidence/'CONTROLLER_ERROR.log').write_text(traceback.format_exc(),encoding='utf8')
+    finally:
+        for p in (WORK/'build/reports',WORK/'normal-subject/evidence',WORK/'installed-jpeg/evidence'):
+            if p.is_dir():shutil.copytree(p,evidence/p.parent.name,dirs_exist_ok=True)
+        result['stages']=stages;save(evidence/'SUMMARY.json',result)
+        reports=WORK/'reports.zip'
+        with zipfile.ZipFile(reports,'x',compression=zipfile.ZIP_DEFLATED) as z:
+            for p in sorted(evidence.rglob('*')):
+                if p.is_file():z.write(p,p.relative_to(evidence).as_posix())
+        run('encrypt-current-reports',['node',transport,'encrypt','--input',reports,'--output',encrypted/'reports.enc','--manifest',encrypted/'REPORTS_READY.json','--id','reports'],private=True)
+        if package and package.is_file():run('encrypt-current-package',['node',transport,'encrypt','--input',package,'--output',encrypted/'package.enc','--manifest',encrypted/'PACKAGE_READY.json','--id','pkg'],private=True)
+        print(json.dumps({'status':result['status'],'published':False}),flush=True)
+    return 0 if ok else 1
+if __name__=='__main__':sys.exit(main())

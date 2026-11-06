@@ -1,0 +1,14 @@
+{
+  "schema": "omc-aes256gcm-build-transport-v1",
+  "assets": [
+    {
+      "id": "final21-helpers",
+      "plaintextBytes": 174925,
+      "plaintextSha256": "6ee0937c303e731d00e09a2907a92f4a714e6ad8765ad5a5e6ad76d0c2d5550c",
+      "ciphertextBytes": 174925,
+      "nonceHex": "485b8c7b1bc60307ce50115b",
+      "ciphertextSha256": "d268c3a41c6b38add985dd2bf31c24ed28dbbf4ecc31c8086814e6a2202133c3",
+      "tagHex": "c28429327e72166cade110015443838e"
+    }
+  ]
+}

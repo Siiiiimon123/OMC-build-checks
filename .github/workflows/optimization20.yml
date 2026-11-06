@@ -1,11 +1,11 @@
-name: R39 licensed subject worker, native regression and protection checks
+name: Preview21 incremental packages and installed subject restoration
 'on':
   push:
     branches: ['verify-optimization20']
-    paths: ['.github/workflows/optimization20.yml', 'opt20/**']
+    paths: ['final21/**', '.github/workflows/optimization20.yml']
 permissions: {contents: read, actions: read}
 jobs:
-  regression:
+  delivery:
     if: github.repository == 'Siiiiimon123/OMC-build-checks' && github.event.repository.private == false && github.run_attempt == 1
     strategy:
       fail-fast: false
@@ -13,9 +13,9 @@ jobs:
         include:
           - {os: windows-2025, arch: x64}
           - {os: macos-15, arch: arm64}
-    concurrency: {group: 'omc-risk-reference-${{ matrix.os }}', cancel-in-progress: false}
+    concurrency: {group: 'omc-delivery21-${{ matrix.os }}', cancel-in-progress: false}
     runs-on: '${{ matrix.os }}'
-    timeout-minutes: 20
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with: {persist-credentials: false, fetch-depth: 1}
@@ -23,21 +23,30 @@ jobs:
         with: {node-version: '24.19.0', architecture: '${{ matrix.arch }}', check-latest: false, package-manager-cache: false}
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
         with: {python-version: '3.12.10', architecture: '${{ matrix.arch }}', check-latest: false}
-      - name: Source guards and existing face model on four encrypted anonymous files
+      - name: Parse exact controls before downloads
+        run: python -c "import ast,pathlib,subprocess; p=pathlib.Path('final21'); [ast.parse(f.read_text(encoding='utf8')) for f in p.glob('*.py')]; [subprocess.run(['node','--check',str(f)],check=True) for f in list(p.glob('*.cjs'))+list(p.glob('*.mjs'))]"
+      - name: Incremental build, first install and real workflows
         env:
           OMC_PREVIEW15_TRANSPORT_KEY: '${{ secrets.OMC_PREVIEW15_TRANSPORT_KEY }}'
+          GH_TOKEN: '${{ github.token }}'
           PYTHONDONTWRITEBYTECODE: '1'
-          OMC_R20_SOURCE_GUARDS_ONLY: '1'
-          OMC_R35_SUBJECT_FOCUS: '1'
-          OMC_R39_NATIVE_RULE: '1'
-          OMC_R36_BODY_PROBE: '1'
-        run: python opt20/run-cloud.py
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: python final21/run-incremental21.py
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         if: always()
         with:
-          name: 'optimization20-${{ matrix.os }}-encrypted-evidence'
+          name: 'final21-${{ matrix.os }}-encrypted-evidence'
           path: |
-            ${{ runner.temp }}/omc-optimization-r20/encrypted/reports.enc
-            ${{ runner.temp }}/omc-optimization-r20/encrypted/REPORTS_READY.json
+            ${{ runner.temp }}/omc-incremental21/encrypted/reports.enc
+            ${{ runner.temp }}/omc-incremental21/encrypted/REPORTS_READY.json
+          retention-days: 7
+          if-no-files-found: warn
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        if: always()
+        with:
+          name: 'final21-${{ matrix.os }}-encrypted-package'
+          path: |
+            ${{ runner.temp }}/omc-incremental21/encrypted/package.enc
+            ${{ runner.temp }}/omc-incremental21/encrypted/PACKAGE_READY.json
           retention-days: 7
           if-no-files-found: warn
