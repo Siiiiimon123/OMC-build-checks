@@ -16,6 +16,7 @@ const report={schema:'omc-existing-face-native-focus-probe-v1',status:'RUNNING',
  images:'Only four previously shown anonymized overview/native crop files; no new full originals',
  newModelAdded:false,automaticRejectionTested:false,installedPackageTested:false,rows:[]};
 const bodyProbe=process.env.OMC_R36_BODY_PROBE==='1';
+const productWorkerProbe=process.env.OMC_R37_SUBJECT_WORKER==='1';
 if(bodyProbe){report.schema='omc-isolated-person-candidate-probe-v1';report.newModelAdded=true;report.candidateModelTested=true;report.candidateIntegratedIntoProduct=false;}
 const log=fs.openSync(path.join(evidence,'source-app.log'),'a');let app,server,ws,seq=0;const pending=new Map();
 const env={...process.env};for(const k of Object.keys(env))if(/^(OMC_|GH_TOKEN|GITHUB_TOKEN|ELECTRON_RUN_AS_NODE)/.test(k))delete env[k];
@@ -61,8 +62,21 @@ try{
  let target;for(let n=0;n<200;n++){try{const port=Number(fs.readFileSync(path.join(profile,'DevToolsActivePort'),'utf8').split('\n')[0]);target=(await(await fetch('http://127.0.0.1:'+port+'/json/list')).json()).find(p=>p.type==='page'&&p.url.startsWith('http://localhost:5173'));if(target)break;}catch{}await delay(250);}check(target,'SOURCE_RENDERER_NOT_READY');
  ws=new WebSocket(target.webSocketDebuggerUrl);await new Promise((r,j)=>{const t=setTimeout(()=>j(Error('CDP_OPEN')),10000);ws.addEventListener('open',()=>{clearTimeout(t);r();},{once:true});ws.addEventListener('error',()=>{clearTimeout(t);j(Error('CDP_OPEN'));},{once:true});});
  ws.addEventListener('message',e=>{const m=JSON.parse(e.data),p=pending.get(m.id);if(p){pending.delete(m.id);clearTimeout(p.t);m.error?p.reject(Error(JSON.stringify(m.error))):p.resolve(m.result);}});await call('Runtime.enable');
- for(const f of fixtures.files.filter(f=>!bodyProbe||f.file.endsWith('-overview.jpg')||process.platform==='win32')){
+ for(const f of fixtures.files.filter(f=>!bodyProbe||f.file.endsWith('-overview.jpg')||process.platform==='win32'||productWorkerProbe)){
   if(bodyProbe){
+   if(productWorkerProbe && f.file.endsWith('-overview.jpg')) {
+    const row=await evaluate(`(async()=>{
+     const {verifySubjectFocusOriginal,releaseSubjectFocusWorker}=await import('/src/services/subjectFocusOriginal.js');
+     const bytes=new Uint8Array(await(await fetch(${JSON.stringify('/__focus-fixture/'+f.file)})).arrayBuffer());
+     let ticks=0;const timer=setInterval(()=>ticks++,10),start=performance.now();
+     try{const metrics=await verifySubjectFocusOriginal(bytes,{assets:{wasmUrl:location.origin+'/mediapipe/wasm',modelUrl:location.origin+'/models/subject-person-candidate.tflite'}});
+      return{elapsedMs:performance.now()-start,mainThreadTicks:ticks,metrics};
+     }finally{clearInterval(timer);releaseSubjectFocusWorker();}
+    })()`);
+    check(row.metrics.sourceKind==='original-jpeg-subject-regions','PRODUCT_WORKER_EVIDENCE_KIND');
+    check(row.mainThreadTicks>0,'MAIN_THREAD_DID_NOT_YIELD');
+    report.rows.push({file:f.file,inputSha256:f.sha256,workerTested:true,...row});continue;
+   }
    if(f.file.endsWith('-crop.png')){
     const row=await evaluate(`(async()=>{const {measureNativeSubjectFocus}=await import('/src/services/subjectFocusMeasurement.js');const image=new Image();image.src=${JSON.stringify('/__focus-fixture/'+f.file)};await image.decode();const c=document.createElement('canvas');c.width=image.naturalWidth;c.height=image.naturalHeight;const x=c.getContext('2d',{willReadFrequently:true});x.drawImage(image,0,0);const facts=measureNativeSubjectFocus(x.getImageData(0,0,c.width,c.height).data,c.width,c.height);c.width=c.height=1;return{width:image.naturalWidth,height:image.naturalHeight,facts};})()`);
     report.rows.push({file:f.file,inputSha256:f.sha256,...row});continue;
@@ -85,7 +99,7 @@ try{
   check(row.face.available===true,'EXISTING_FACE_RUNTIME_UNAVAILABLE');report.rows.push({file:f.file,inputSha256:f.sha256,...row});
   fs.writeFileSync(path.join(evidence,'SUBJECT_FOCUS_PROBE.json'),JSON.stringify(report,null,2));
  }
- report.status='PASS_PROBE_EXECUTED_NOT_AUTOMATIC_REJECTION';
+ report.status=productWorkerProbe?'PASS_PRODUCT_WORKER_NOT_FULL_ORIGINAL_REJECTION':'PASS_PROBE_EXECUTED_NOT_AUTOMATIC_REJECTION';
  report.limitations=bodyProbe
   ? ['Isolated candidate person localization only; candidate not integrated or distributed','Existing anonymous overviews/crops only; no new originals','Detection boxes do not prove main subject intent, focus loss or recoverability','Windows native-crop facts are separate from body localization; passed Mac crop measurements are not repeated']
   : ['Source renderer and existing face model only; not a shipped installer acceptance','Overview geometry and provided native crop measured separately; no whole-original rejection claimed','Face landmarks are proposals, not proof of main subject, identity, or recoverability','Human-confirmed samples are holdout only; no learned weights trained'];

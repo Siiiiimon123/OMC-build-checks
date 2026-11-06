@@ -146,6 +146,9 @@ try:
         if os.environ.get('OMC_R35_SUBJECT_FOCUS')=='1':
             checks.append(stage('native-focus-facts-and-proposals',['node','--test',
                 'src/services/subjectFocusMeasurement.test.js',
+                'src/services/subjectFocusPolicy.test.js',
+                'src/services/subjectFocusOriginal.test.js',
+                'src/services/subjectFocusOriginal.worker.test.js',
                 'src/services/conservativeAutomaticReview.test.js'],source))
         if os.environ.get('OMC_R34_TECHNICAL_REFERENCE')=='1':
             checks.append(stage('technical-reference-and-decision-boundaries',['node','--test',
