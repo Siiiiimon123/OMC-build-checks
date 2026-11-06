@@ -1,0 +1,15 @@
+{
+  "version": "1.0.21-preview.23",
+  "macSourceTree": "be3c2093a1bc62ea5755f8ed49326186be980e5e",
+  "windowsSourceTree": "8193729f927e6f292c6fe2eb383bec2f16a0a92f",
+  "sourceChecks": {
+    "run": 42308561892,
+    "control": "393489e60fb9e96841c9dee5d6196b88e69dc3b4",
+    "artifact": 13548075721,
+    "reportSha256": "41e609844885f205177561acab630d17dd4151880333640202afcadcb797be14",
+    "corePassed": 415,
+    "browserPassed": 9
+  },
+  "sourceInputDirectory": "probability23",
+  "helperUnpackedBytes": 0
+}
