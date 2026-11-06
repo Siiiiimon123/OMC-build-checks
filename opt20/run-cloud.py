@@ -143,7 +143,45 @@ try:
         raise SystemExit(0 if ok else 1)
     if os.environ.get('OMC_R20_SOURCE_GUARDS_ONLY')=='1':
         checks=[]
-        (REPORTS/'SCOPE.json').write_text(json.dumps({'componentOnly':True,'sourceTree':expected['sourceTree'],'sourceFiles':expected['sourceFiles'],'inheritedWindowsSourceRun':42245368020,'macSourceRunPendingAtDispatch':True,'repeatPriorCoreAndBuild':False,'newNativePatchFiles':6,'newFullOriginals':0}),encoding='utf8')
+        if os.environ.get('OMC_R35_SUBJECT_FOCUS')=='1':
+            checks.append(stage('native-focus-facts-and-proposals',['node','--test',
+                'src/services/subjectFocusMeasurement.test.js',
+                'src/services/subjectFocusPolicy.test.js',
+                'src/services/subjectFocusOriginal.test.js',
+                'src/services/subjectFocusOriginal.worker.test.js',
+                'src/services/conservativeAutomaticReview.test.js'],source))
+        if os.environ.get('OMC_R34_TECHNICAL_REFERENCE')=='1':
+            checks.append(stage('technical-reference-and-decision-boundaries',['node','--test',
+                'src/services/ai/technicalWasteEvaluator.test.js',
+                'src/services/ai/technicalWasteDecisionProtection.test.js',
+                'src/services/ai/wasteDecisionPolicy.test.js',
+                'src/services/conservativeAutomaticReview.test.js'],source))
+        if os.environ.get('OMC_R26_SATURATION_KERNEL')=='1':
+            checks.append(stage('saturation-production-delegation-contracts',['node','--test',
+                'src/services/jpegSaturation.test.js','src/services/jpegContrast.test.js',
+                'src/services/jpegWhiteBalance.test.js','src/services/jpegTones.test.js',
+                'src/services/jpegVibranceRecipe.test.js','src/services/jpegExposurePipeline.test.js'],source))
+        if os.environ.get('OMC_R25_INFERENCE_WAVE')=='1':
+            checks.append(stage('inference-wave-contracts',['node','--test',
+                'src/services/ai/modelLoaderBatch.test.js'],source))
+        if os.environ.get('OMC_R24_ANALYSIS_YIELD')=='1':
+            checks.append(stage('analysis-yield-contracts',['node','--test','--test-name-pattern','analysis yield',
+                'src/services/analysisPerformance.test.js'],source))
+        if os.environ.get('OMC_R23_TECHNICAL_AND_PREVIEW')=='1':
+            checks.append(stage('directional-triage-and-neutral-preview-contracts',['node','--test',
+                'src/services/ai/technicalWasteEvaluator.test.js',
+                'src/services/automaticAdjustmentPreview.test.js'],source))
+        if os.environ.get('OMC_R21_INCREMENTAL')=='1':
+            checks.append(stage('source-recovery-compatibility',['node','--test','src/services/sourceRecoveryEdits.test.js',
+                'src/services/sourceRecoveryGroupPreservation.test.js'],source))
+        if os.environ.get('OMC_R20_COMMIT_WAVE')=='1':
+            checks.append(stage('durable-analysis-wave-contracts',['node','--test','src/services/analysisPerformance.test.js',
+                'src/services/analysisTerminalCommit.test.js','src/services/ai/modelLoaderBatch.test.js'],source))
+        checks.extend([stage('core',[npm,'run','test:core'],source),
+            stage('browser-preview',[npm,'run','test:browser-preview'],source)])
+        previous=source/'preview-manifest.json'
+        if previous.exists():previous.rename(REPORTS/'previous-preview-manifest.json')
+        checks.append(stage('build-browser-preview',[npm,'run','build:browser-preview'],source))
         if all(checks) and os.environ.get('OMC_R35_SUBJECT_FOCUS')=='1':
             scoped=HERE.parent/'focus35'
             manifest=json.loads((scoped/'FIXTURES.transport.json').read_bytes())
@@ -382,8 +420,8 @@ finally:
             'installerBuilt':False,'published':False}
     if os.environ.get('OMC_R35_SUBJECT_FOCUS')=='1':
         result.update(memberPhotosUsed=True,anonymousDerivativesUsed=True,fullOriginalsUploadedByThisRun=False)
-    if os.environ.get('OMC_R38_NATIVE_PATCHES')=='1':
-        result.update(status='PASS_NATIVE_COMPONENT_NOT_RELEASE' if ok else 'FAIL_NATIVE_COMPONENT',coreRepeated=False,fullAiTested=False,wholeOriginalSubjectRejectionTested=False)
+    if os.environ.get('OMC_R39_NATIVE_RULE')=='1':
+        result.update(status='PASS_SUBJECT_RULE_COMPONENT_NOT_RELEASE' if ok else 'FAIL_SUBJECT_RULE_COMPONENT',fullAiTested=False,wholeOriginalSubjectRejectionTested=False)
     if os.environ.get('OMC_R20_ENGINE_BASELINE')=='1':
         result['status']='PASS_IMMUTABLE_ENGINE_BASELINE_NOT_CURRENT_PRODUCT' if ok else 'FAIL_IMMUTABLE_ENGINE_BASELINE'
         result['engineBaselineOnly']=True

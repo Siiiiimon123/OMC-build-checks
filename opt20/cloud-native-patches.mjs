@@ -17,8 +17,8 @@ const report={schema:'omc-existing-face-native-focus-probe-v1',status:'RUNNING',
  images:'Only four previously shown anonymized overview/native crop files; no new full originals',
  newModelAdded:false,automaticRejectionTested:false,installedPackageTested:false,rows:[]};
 const bodyProbe=process.env.OMC_R36_BODY_PROBE==='1';
-const productWorkerProbe=false;
-if(bodyProbe){report.schema='omc-isolated-person-candidate-probe-v1';report.newModelAdded=true;report.candidateModelTested=true;report.candidateIntegratedIntoProduct=false;}
+const productWorkerProbe=true;
+if(bodyProbe){report.schema='omc-isolated-person-candidate-probe-v1';report.newModelAdded=true;report.candidateModelTested=true;report.candidateIntegratedIntoProduct=true;report.installedPackageTested=false;}
 const log=fs.openSync(path.join(evidence,'source-app.log'),'a');let app,server,ws,seq=0;const pending=new Map();
 const env={...process.env};for(const k of Object.keys(env))if(/^(OMC_|GH_TOKEN|GITHUB_TOKEN|ELECTRON_RUN_AS_NODE)/.test(k))delete env[k];
 function call(method,params={}){return new Promise((resolve,reject)=>{const id=++seq,t=setTimeout(()=>{pending.delete(id);reject(Error('CDP_TIMEOUT:'+method));},120000);pending.set(id,{resolve,reject,t});ws.send(JSON.stringify({id,method,params}));});}
@@ -56,7 +56,7 @@ try{
   check(members.length===1&&members[0].name==='1.tflite','EXACT_MODEL_MEMBER');const bytes=members[0].data;
   check(bytes.length===config.bytes&&hash(bytes)===config.sha256,'EXACT_APACHE_MODEL_IDENTITY');n=bytes.length;
   const p=path.join(work,'person-candidate.tflite');fs.writeFileSync(p,bytes,{flag:'wx'});
-  routes.set('/models/subject-person-candidate.tflite',{path:p,type:'application/octet-stream'});
+  routes.set('/models/subject-person-candidate.tflite',{path:p,type:'application/octet-stream'});routes.set('/models/subject_person.tflite',{path:p,type:'application/octet-stream'});
   report.candidateModel={bytes:n,sha256:hash(bytes),url:config.url,provider:'CPU',
    embeddedLicenseHints:(bytes.toString('latin1').match(/[\x20-\x7e]{12,}/g)??[]).filter(s=>/apache|licen[cs]e|tensorflow\.org/i.test(s)).slice(0,12)};
  }
@@ -79,9 +79,9 @@ try{
      const {verifySubjectFocusOriginal,releaseSubjectFocusWorker}=await import('/src/services/subjectFocusOriginal.js');
      const bytes=new Uint8Array(await(await fetch(${JSON.stringify('/__focus-fixture/'+f.file)})).arrayBuffer());
      let ticks=0;const timer=setInterval(()=>ticks++,10),start=performance.now();
-     try{const metrics=await verifySubjectFocusOriginal(bytes,{assets:{wasmUrl:location.origin+'/mediapipe/wasm',modelUrl:location.origin+'/models/subject-person-candidate.tflite'}});
+     try{const metrics=await verifySubjectFocusOriginal(bytes,{});
       return{elapsedMs:performance.now()-start,mainThreadTicks:ticks,metrics};
-     }finally{clearInterval(timer);releaseSubjectFocusWorker();}
+     }finally{clearInterval(timer);}
     })()`);
     check(row.metrics.sourceKind==='original-jpeg-subject-regions','PRODUCT_WORKER_EVIDENCE_KIND');
     check(row.mainThreadTicks>0,'MAIN_THREAD_DID_NOT_YIELD');
@@ -109,13 +109,15 @@ try{
   check(row.face.available===true,'EXISTING_FACE_RUNTIME_UNAVAILABLE');report.rows.push({file:f.file,inputSha256:f.sha256,...row});
   fs.writeFileSync(path.join(evidence,'SUBJECT_FOCUS_PROBE.json'),JSON.stringify(report,null,2));
  }
+ await evaluate(`(async()=>{const {releaseSubjectFocusWorker}=await import('/src/services/subjectFocusOriginal.js');releaseSubjectFocusWorker();return true;})()`);
  report.nativeCases=[];
  for(const c of nativeInputs.cases){
+  const actualProposal=report.rows.find(r=>r.file===c.case+'-overview.jpg')?.metrics?.subjectFocus?.proposal;check(actualProposal,'ACTUAL_PRODUCT_PERSON_PROPOSAL_MISSING');
   const row=await evaluate(`(async()=>{
    const c=${JSON.stringify(c)};
    const {measureNativeSubjectFocus}=await import('/src/services/subjectFocusMeasurement.js');
    const {SUBJECT_FOCUS_SCHEMA,SUBJECT_FOCUS_RULE,SUBJECT_PERSON_MODEL_SHA256,subjectFocusPatchBounds,classifySubjectFocusEvidence}=await import('/src/services/subjectFocusPolicy.js');
-   const proposal={schemaVersion:SUBJECT_FOCUS_SCHEMA,ruleVersion:SUBJECT_FOCUS_RULE,modelSha256:SUBJECT_PERSON_MODEL_SHA256,coordinateSpace:'oriented-original-normalized',rect:c.proposalRect,detectionScore:c.detectionScore,inputWidth:c.overviewWidth,inputHeight:c.overviewHeight};
+   const proposal=${JSON.stringify(actualProposal)};if(c.detectionModelSha256!==SUBJECT_PERSON_MODEL_SHA256||JSON.stringify(proposal.rect)!==JSON.stringify(c.proposalRect))throw Error('ACTUAL_PROPOSAL_FIXTURE_GEOMETRY_MISMATCH');
    const bounds=subjectFocusPatchBounds(proposal,c.width,c.height);if(bounds.length!==3)throw Error('NATIVE_BOUNDS_NOT_ELIGIBLE');
    const patches=[];for(let i=0;i<3;i++){const f=c.files[i],b=bounds[i];if(['role','left','top','width','height'].some(k=>f[k]!==b[k]))throw Error('NATIVE_BOUNDS_MISMATCH');const image=new Image();image.src='/__native-patch/'+f.file;await image.decode();if(image.naturalWidth!==b.width||image.naturalHeight!==b.height)throw Error('NATIVE_PIXEL_DIMENSIONS');const canvas=document.createElement('canvas');canvas.width=b.width;canvas.height=b.height;const x=canvas.getContext('2d',{willReadFrequently:true});x.drawImage(image,0,0);patches.push({...b,facts:measureNativeSubjectFocus(x.getImageData(0,0,b.width,b.height).data,b.width,b.height)});canvas.width=canvas.height=1;}
    const evidence={schemaVersion:SUBJECT_FOCUS_SCHEMA,ruleVersion:SUBJECT_FOCUS_RULE,sourceKind:'original-jpeg',nativePixels:true,orientationApplied:true,modelSha256:SUBJECT_PERSON_MODEL_SHA256,width:c.width,height:c.height,proposal,patches};
@@ -128,7 +130,7 @@ try{
  fs.writeFileSync(path.join(evidence,'SUBJECT_FOCUS_PROBE.json'),JSON.stringify(report,null,2));
  check(report.nativeCases.find(r=>r.case==='R2-08').classification?.kind==='severe-subject-softness-original','HUMAN_SEVERE_HOLDOUT_NOT_CLASSIFIED');
  check(report.nativeCases.find(r=>r.case==='R2-04').classification===null,'HUMAN_USABLE_HOLDOUT_NOT_PROTECTED');
- report.status='PASS_NATIVE_PATCH_RULE_AND_ALTERNATE_MODEL_ONLY';
+ report.status='PASS_PRODUCT_WORKER_AND_NATIVE_REGRESSION_COMPONENTS';
  report.limitations=bodyProbe
   ? ['Isolated candidate person localization only; candidate not integrated or distributed','Existing anonymous overviews/crops only; no new originals','Detection boxes do not prove main subject intent, focus loss or recoverability','Windows native-crop facts are separate from body localization; passed Mac crop measurements are not repeated']
   : ['Source renderer and existing face model only; not a shipped installer acceptance','Overview geometry and provided native crop measured separately; no whole-original rejection claimed','Face landmarks are proposals, not proof of main subject, identity, or recoverability','Human-confirmed samples are holdout only; no learned weights trained'];

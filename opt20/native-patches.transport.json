@@ -3,12 +3,12 @@
   "assets": [
     {
       "id": "native-subject-patches",
-      "plaintextBytes": 1659902,
-      "plaintextSha256": "4a38075655a05e3002a3011975bc7bd059e7db35856d4547258f9c04aad1a017",
-      "ciphertextBytes": 1659902,
-      "nonceHex": "468cc55c5767847f186cdcf3",
-      "ciphertextSha256": "e5349272d0e96c93beaefe0b4bb723e50f7af05eb37594e2237d0f645e502bff",
-      "tagHex": "75cced5fa090898b36f785d8a9ac78bb"
+      "plaintextBytes": 1636909,
+      "plaintextSha256": "0944ac1ef1354acb637b7f42ef08ab9ede34136244dbb7d78cde9a8a5d00265a",
+      "ciphertextBytes": 1636909,
+      "nonceHex": "c140a47d03ec161b579bf618",
+      "ciphertextSha256": "7f9dcab8ef8bf9e7b80a0eb08694f4411106ef600deecf2f58070847d7853e36",
+      "tagHex": "85820287b547a1bc0a9f79393ce195d8"
     }
   ]
 }
