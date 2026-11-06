@@ -21,6 +21,7 @@ jobs:
         env:
           OMC_PREVIEW15_TRANSPORT_KEY: '${{ secrets.OMC_PREVIEW15_TRANSPORT_KEY }}'
           PYTHONDONTWRITEBYTECODE: '1'
+          OMC_JPEG_RACE_REPAIR_ONLY: '1'
         run: python opt20/run-jpeg-race.py
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         if: always()
