@@ -43,7 +43,7 @@ def stage(name, command, cwd=WORK, timeout=240, private=False):
         # Core tests use repository-owned synthetic fixtures; reveal only the
         # bounded test titles, never assertion bodies, paths or source stacks.
         if name in ('core','browser-preview'):
-            titles=re.findall(r'(?m)^not ok \d+ - ([^\r\n]{1,180})',r.stdout.decode('utf-8','replace'))
+            titles=re.findall(r'(?m)^(?:not ok \d+ - |\u2716 )([^\r\n]{1,180})',r.stdout.decode('utf-8','replace'))
             titles=[title for title in titles if '://' not in title and ':\\' not in title][:12]
             print(json.dumps({'failedTestStage':name,'failedTestTitles':titles}),flush=True)
         raise RuntimeError('STAGE_FAILED:' + name)
@@ -91,7 +91,7 @@ try:
                    for p in source.rglob('*') if p.is_file()], key=lambda x: x[0])
     digest = hashlib.sha256(json.dumps(rows, ensure_ascii=False, separators=(',', ':')).encode('utf-8')).hexdigest()
     expected = json.loads((HERE / 'engine-baseline-input.json').read_bytes())
-    if expected['sourceTree'] != '2403c7bffccb40dadfcc7738af175f5ac6a8024f' or len(rows) != 935 or digest != '18322f4bf75638e820f3ed7242f4d887f2f7489868b4a3679b9b39f0f4db2f40':
+    if expected['sourceTree'] != 'b4142fc30632ad6d3eb7ab9f5f07ad7622ab5f28' or len(rows) != 935 or digest != 'e8830ee61ddacc245bc9cde7e45b5bc1436cd9b6766df8b42ff9069093a5fd78':
         raise RuntimeError('FROZEN_SOURCE_IDENTITY')
     (REPORTS / 'FROZEN_INPUTS.json').write_text(json.dumps({**expected,
         'verifiedSourcePathSha256Digest': digest, 'controlCommit': os.environ.get('GITHUB_SHA'),
@@ -173,7 +173,7 @@ finally:
             'persistentExportStatusVerified':finished.get('persistentExportStatusVerified')
         }}),flush=True)
     (REPORTS / 'SUMMARY.json').write_text(json.dumps({'status': status, 'platform': sys.platform,
-        'stages': stages, 'sourceTree': '2403c7bffccb40dadfcc7738af175f5ac6a8024f',
+        'stages': stages, 'sourceTree': 'b4142fc30632ad6d3eb7ab9f5f07ad7622ab5f28',
         'memberPhotos': ['sample-a', 'sample-b'], 'scriptDrivenRealGui': True,
         'installedPackageTested': False, 'completeAiTested': False, 'realThousandTested': False,
         'published': False}), encoding='utf-8')
