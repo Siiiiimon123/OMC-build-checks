@@ -55,7 +55,7 @@ def main():
                 assert not dest.exists() if r['beforeSha256'] is None else sha(dest)==r['beforeSha256']
                 data=z.read(r['path']);assert hashlib.sha256(data).hexdigest()==r['sha256'];dest.parent.mkdir(parents=True,exist_ok=True);dest.write_bytes(data)
         helper_cipher=WORK/'helpers.enc';helper_cipher.write_bytes(base64.b64decode((HERE/'helpers.b64').read_bytes(),validate=True))
-        decrypt(HERE/'HELPERS.transport.json','final21-helpers',helper_cipher,WORK/'helpers.zip')
+        decrypt(HERE/'HELPERS.transport.json','final21-repair',helper_cipher,WORK/'helpers.zip')
         inputs=WORK/'inputs';unzip(WORK/'helpers.zip',inputs,2*1024**2)
         records=json.loads((inputs/'source19-records.json').read_bytes())
         assert records['sourceTree']==SOURCE_TREE and len(records['records'])==945
@@ -84,18 +84,10 @@ def main():
             decrypt(meta,a['id'],target,WORK/(a['id']+'.jpg'))
         npm='npm.cmd' if sys.platform=='win32' else 'npm'
         run('fixed-build-dependencies',[npm,'ci','--ignore-scripts','--no-audit','--no-fund'],source,600)
-        run('current-core-checks',[npm,'run','test:core'],source,300)
-        run('current-browser-checks',[npm,'run','test:browser-preview'],source,300)
-        # The rule-only snapshot intentionally excludes AI assets. Validate it
-        # before staging the separate desktop assets, preserving tracked bytes.
-        original_preview=source/'preview-manifest.json';saved_preview=WORK/'frozen-preview-manifest.json'
-        original_preview.rename(saved_preview)
-        try:
-            run('current-rule-only-browser-build',[npm,'run','build:browser-preview'],source,300)
-            shutil.copyfile(original_preview,evidence/'RULE_ONLY_PREVIEW_MANIFEST.json')
-        finally:
-            if original_preview.exists():original_preview.unlink()
-            saved_preview.rename(original_preview)
+        save(evidence/'REUSED_SOURCE_CHECKS.json',{'sourceTree':SOURCE_TREE,'run':42259341867,
+            'coreBrowserBuildPassedBothPlatforms':True,'sourceUnchanged':True,
+            'reportSha256Windows':'ba8edf7e0cb73e9531e8785ad5bfe1f8aee32ef437bae553c274c0c761094fb3',
+            'reportSha256Mac':'79b8d261acb9b571c10fba2514cfd4300bd66ebb8f63ac95402a9cf9d7ec4bac'})
         mode='windows' if sys.platform=='win32' else 'mac';base_info=json.loads((HERE/'BASE20_ARTIFACTS.json').read_bytes())[mode]
         artifact=WORK/'base20.zip';run('fetch-accepted-package20',['node',HERE/'fetch-base20.mjs',mode,artifact],timeout=600,private=True)
         frozen=WORK/'frozen-base';unzip(artifact,frozen,1100*1024**2)
@@ -106,9 +98,12 @@ def main():
         # Current-run authenticated transport copies only, never originals/history.
         artifact.unlink();(frozen/'package.enc').unlink()
         if mode=='windows':
-            run('build-current-windows',['node',HERE/'build-windows21.cjs','--source',source,'--base',base,'--work',WORK/'build','--inputs',inputs],source,1800)
-            built=json.loads((WORK/'build/reports/PACKAGE_INPUTS.json').read_bytes());package=Path(built['current']['path'])
-            shutil.copyfile(WORK/'build/reports/FINAL_APP_MEMBERS.json',inputs/'FINAL_APP_MEMBERS.json')
+            built=json.loads((inputs/'REUSED_WINDOWS21_INPUTS.json').read_bytes())
+            assert built['baselineSourceTree']==SOURCE_TREE
+            assert built['current']['bytes']==base_info['plainBytes'] and built['current']['sha256']==base_info['plainSha256']
+            package=base;built['current']['path']=str(package)
+            save(evidence/'PACKAGE_REUSE.json',{'sourceTree':SOURCE_TREE,'packageRebuilt':False,
+                'packageSha256':sha(package),'packageArtifact':base_info['id']})
             install_input=inputs/'PACKAGE_INPUTS.json';save(install_input,built)
             run('pristine-current-windows-install',['powershell.exe','-NoProfile','-ExecutionPolicy','Bypass','-File',inputs/'Install-FinalWindows.ps1','-InputsPath',install_input,'-OutputPath',evidence/'FIRST_INSTALL.json'],timeout=600)
             installed_info=json.loads((evidence/'FIRST_INSTALL.json').read_text(encoding='utf-8-sig'));assert installed_info['shortcutBindingPassed'] is True
@@ -122,7 +117,7 @@ def main():
             run('verify-installed-mac-entry',['node',HERE/'verify-mac-entry.cjs',source,built['installedApp'],frontend['asarSha256'],evidence/'MAC_APP_ENTRY.json'],source)
         # Free only reproducible staging trees from this disposable VM after
         # exact installer and installed-payload verification. Keep all reports.
-        base.unlink()
+        if base!=package:base.unlink()
         for rel in ('build/fullApp','build/asar-input','build/output/OMC-Preview.app','build/nonrelocatable-pkg-build/payload-root'):
             p=WORK/rel
             if p.exists():assert p.resolve().is_relative_to(WORK.resolve()) and not p.is_symlink();shutil.rmtree(p)

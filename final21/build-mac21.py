@@ -35,6 +35,15 @@ def main():
     assert len(matches)==1 and matches[0].name=='OMC-Preview.app'
     output=work/'output';output.mkdir();app=output/'OMC-Preview.app';matches[0].rename(app)
     before=inventory(app)
+    # Remove only Electron's known sample entry inside this newly assembled VM app.
+    default_entry=app/'Contents/Resources/default_app.asar'
+    removed_default=None
+    if default_entry.exists():
+        assert default_entry.is_file() and not default_entry.is_symlink()
+        removed_default={'bytes':default_entry.stat().st_size,'sha256':sha(default_entry)}
+        default_entry.unlink()
+    assert not (app/'Contents/Resources/app').exists(),'UNEXPECTED_UNPACKED_ENTRY'
+    save(reports/'REMOVED_DEFAULT_ENTRY.json',{'removed':removed_default,'scope':'owned VM build only'})
     run('rebuild-current-frontend',['node',Path(__file__).with_name('rebuild-mac-asar.cjs'),source,app,inputs,work,reports])
     plist=app/'Contents/Info.plist';info=plistlib.loads(plist.read_bytes())
     assert info['CFBundleIdentifier']=='com.omc.photo-select'
@@ -42,6 +51,7 @@ def main():
     frontend=json.loads((reports/'FRONTEND_REBUILD.json').read_bytes())
     assert 'Resources/app.asar' in info['ElectronAsarIntegrity']
     info['ElectronAsarIntegrity']['Resources/app.asar']={'algorithm':'SHA256','hash':frontend['asarHeaderSha256']}
+    info['ElectronAsarIntegrity'].pop('Resources/default_app.asar',None)
     plist.write_bytes(plistlib.dumps(info))
     normalize_install_permissions(app,reports/'APP_INSTALL_PERMISSIONS.json')
     run('sign-outer-app',['/usr/bin/codesign','--force','--sign','-','--timestamp=none',
@@ -50,11 +60,12 @@ def main():
     after=inventory(app)
     modified=sorted(name for name in set(before)|set(after) if before.get(name)!=after.get(name))
     allowed={'Contents/Resources/app.asar','Contents/Info.plist','Contents/_CodeSignature/CodeResources',
-             'Contents/MacOS/'+info['CFBundleExecutable']}
+             'Contents/MacOS/'+info['CFBundleExecutable'],'Contents/Resources/default_app.asar'}
     assert set(modified)<=allowed, 'PRESERVED_RUNTIME_OR_NESTED_SIGNATURE_CHANGED'
     save(reports/'UNCHANGED_RUNTIME_PROOF.json',{'status':'PASS','baselinePackageSha256':sha(base),
         'allAiSourcesIdentical':True,'backendRebuilt':False,'changedOuterAppMembers':modified,
         'allOtherPayloadMembersIdentical':True})
+    run('verify-prepackage-entry',['node',Path(__file__).with_name('verify-mac-entry.cjs'),source,app,frontend['asarSha256'],reports/'PREPACKAGE_ENTRY.json'])
     pkg=output/'OMC-Preview-1.0.21-preview.21-mac-arm64-unsigned.pkg'
     build_nonrelocatable_pkg(app,work,pkg,run,reports)
     expanded_final=work/'final-pkg-expanded'
