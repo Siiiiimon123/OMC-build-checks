@@ -1,0 +1,15 @@
+{
+  "schema": "omc-aes256gcm-build-transport-v1",
+  "assets": [
+    {
+      "id": "final",
+      "plaintextBytes": 1156045943,
+      "plaintextSha256": "6400fe0d915dc0cd68a727772d7e66f9c168ef0d558e706caf40a71e0f9b00cc",
+      "ciphertextBytes": 1156045943,
+      "nonceHex": "4219942ea48610067b99a098",
+      "ciphertextSha256": "f9a686901717492c3fc053e9a9793dfe69d07e4f614c468e05be3811ce34f11c",
+      "tagHex": "055aeb862dace84f5065bc13309509cc",
+      "url": "https://github.com/Siiiiimon123/OMC-build-checks/releases/download/omc-mac-update17-build-41192102628/final.enc"
+    }
+  ]
+}
