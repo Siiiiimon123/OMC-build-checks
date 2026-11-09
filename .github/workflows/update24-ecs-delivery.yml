@@ -1,0 +1,46 @@
+name: Transfer accepted Preview24 packages directly to the owner's server
+'on':
+  push:
+    branches: ['verify-update24-ecs-delivery']
+    paths: ['update24/seal-for-ecs24.cjs', '.github/workflows/update24-ecs-delivery.yml']
+permissions: {contents: read, actions: read}
+jobs:
+  seal:
+    if: github.repository == 'Siiiiimon123/OMC-build-checks' && github.event.repository.private == false && github.run_attempt == 1
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with: {persist-credentials: false, fetch-depth: 1}
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with: {node-version: '24.19.0', architecture: x64, check-latest: false, package-manager-cache: false}
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with: {python-version: '3.12.10', architecture: x64, check-latest: false}
+      - name: Authenticate and seal only the two accepted installers
+        env:
+          OMC_PREVIEW15_TRANSPORT_KEY: '${{ secrets.OMC_PREVIEW15_TRANSPORT_KEY }}'
+          GH_TOKEN: '${{ github.token }}'
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: python update24/seal-for-ecs24.py
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        id: win
+        with:
+          name: omc-preview24-owner-windows
+          path: ${{ runner.temp }}/omc-update24/windows/payload.enc
+          compression-level: 0
+          retention-days: 1
+          if-no-files-found: error
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        id: mac
+        with:
+          name: omc-preview24-owner-mac
+          path: ${{ runner.temp }}/omc-update24/mac/payload.enc
+          compression-level: 0
+          retention-days: 1
+          if-no-files-found: error
+      - name: Generate short-lived owner-only download locators
+        env:
+          GH_TOKEN: '${{ github.token }}'
+          WINDOWS_ARTIFACT: '${{ steps.win.outputs.artifact-id }}'
+          MAC_ARTIFACT: '${{ steps.mac.outputs.artifact-id }}'
+        run: node update24/seal-for-ecs24.cjs locator "$RUNNER_TEMP/omc-update24"
