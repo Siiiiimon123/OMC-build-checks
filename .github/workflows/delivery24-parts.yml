@@ -1,0 +1,76 @@
+name: Same Preview24 ciphertext bounded delivery
+'on':
+  push:
+    branches: ['verify-update24-delivery']
+    paths: ['delivery24/**', '.github/workflows/delivery24-parts.yml']
+permissions: {contents: read, actions: read}
+jobs:
+  fragments:
+    if: github.repository == 'Siiiiimon123/OMC-build-checks' && github.event.repository.private == false && github.run_attempt == 1
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with: {persist-credentials: false, fetch-depth: 1}
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with: {node-version: '24.19.0', architecture: x64, check-latest: false, package-manager-cache: false}
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with: {python-version: '3.12.10', architecture: x64, check-latest: false}
+      - name: Split exact existing ciphertext; no decryption or build
+        env:
+          GH_TOKEN: '${{ github.token }}'
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: python delivery24/split.py
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: delivery24-windows-part000
+          path: ${{ runner.temp }}/omc-delivery24-parts/windows/parts/part000.enc
+          compression-level: 0
+          retention-days: 7
+          if-no-files-found: error
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: delivery24-windows-part001
+          path: ${{ runner.temp }}/omc-delivery24-parts/windows/parts/part001.enc
+          compression-level: 0
+          retention-days: 7
+          if-no-files-found: error
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: delivery24-windows-metadata
+          path: |
+            ${{ runner.temp }}/omc-delivery24-parts/windows/parts/DELIVERY_PARTS.json
+            ${{ runner.temp }}/omc-delivery24-parts/windows/parts/PACKAGE_READY.json
+          compression-level: 0
+          retention-days: 7
+          if-no-files-found: error
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: delivery24-mac-part000
+          path: ${{ runner.temp }}/omc-delivery24-parts/mac/parts/part000.enc
+          compression-level: 0
+          retention-days: 7
+          if-no-files-found: error
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: delivery24-mac-part001
+          path: ${{ runner.temp }}/omc-delivery24-parts/mac/parts/part001.enc
+          compression-level: 0
+          retention-days: 7
+          if-no-files-found: error
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: delivery24-mac-part002
+          path: ${{ runner.temp }}/omc-delivery24-parts/mac/parts/part002.enc
+          compression-level: 0
+          retention-days: 7
+          if-no-files-found: error
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: delivery24-mac-metadata
+          path: |
+            ${{ runner.temp }}/omc-delivery24-parts/mac/parts/DELIVERY_PARTS.json
+            ${{ runner.temp }}/omc-delivery24-parts/mac/parts/PACKAGE_READY.json
+          compression-level: 0
+          retention-days: 7
+          if-no-files-found: error
