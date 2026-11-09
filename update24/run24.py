@@ -18,7 +18,7 @@ WORK = Path(os.environ["RUNNER_TEMP"]).resolve() / "omc-update24"
 WIN = sys.platform == "win32"
 MODE = "windows" if WIN else "mac"
 VERSION = "1.0.21-preview.24"
-BRANCH = "refs/heads/verify-update24"
+BRANCH = os.environ.get("GITHUB_REF")
 BUDGET = 5 * 1024**3
 KEY = "OMC_PREVIEW15_TRANSPORT_KEY"
 
@@ -94,7 +94,8 @@ def reuse_subject(input_var):
 def main():
     assert os.environ.get('GITHUB_ACTIONS') == 'true'
     assert os.environ.get('GITHUB_REPOSITORY') == 'Siiiiimon123/OMC-build-checks'
-    assert os.environ.get('GITHUB_REF') == BRANCH and os.environ.get('GITHUB_RUN_ATTEMPT') == '1'
+    allowed_branches = ('refs/heads/verify-update24','refs/heads/verify-update24-win-tools') if WIN else ('refs/heads/verify-update24',)
+    assert BRANCH in allowed_branches and os.environ.get('GITHUB_RUN_ATTEMPT') == '1'
     assert WIN or sys.platform == 'darwin'
     WORK.mkdir()
     evidence = WORK / 'evidence'; evidence.mkdir()
@@ -237,8 +238,9 @@ def main():
         budget('before-build')
         build = WORK/'build'
         if WIN:
-            zip_tool = WORK/'7zip-win-x64.tar.gz'
-            run('prefetch-exact-approved-7zip',['node',HERE/'prefetch-win-tools.cjs',zip_tool])
+            tool_dir = WORK/'tool-archives'; tool_dir.mkdir()
+            run('prefetch-exact-windows-tools',['node',HERE/'prefetch-win-tools.cjs',tool_dir])
+            zip_tool = tool_dir/'7zip-win-x64.tar.gz'
             with tarfile.open(zip_tool,'r:gz') as archive:
                 members = [m for m in archive.getmembers() if m.isfile() and PurePosixPath(m.name).name == '7za.exe']
                 assert len(members) == 1 and members[0].size == 849920
@@ -247,6 +249,14 @@ def main():
                     shutil.copyfileobj(item,out)
             assert sha(seven) == '223b873c50380fe9a39f1a22b6abf8d46db506e1c08d08312902f6f3cd1f7ac3'
             clean['ELECTRON_BUILDER_7ZIP_PATH'] = str(seven)
+            for prefix, env_name, check in [
+                ('nsis-3.0.4.1','ELECTRON_BUILDER_NSIS_DIR','Bin/makensis.exe'),
+                ('nsis-resources-3.4.1','ELECTRON_BUILDER_NSIS_RESOURCES_DIR','plugins')]:
+                dest = controls / prefix
+                dest.mkdir()
+                run('extract-'+prefix,[seven,'x','-t7z','-y','-bd','-bb0','-o'+str(dest),tool_dir/(prefix+'.7z')])
+                assert (dest/check).exists(), 'LOCKED_TOOL_LAYOUT:'+prefix
+                clean[env_name] = str(dest)
             adapted('native23/build-windows.cjs',controls/'build-windows.cjs',[
                 branch, old_version, ('1.0.21-preview.21','1.0.21-preview.23'),
                 (scope['before'],scope['after']), ('length===945','length==='+str(scope['files'])),
