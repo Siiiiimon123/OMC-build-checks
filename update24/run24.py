@@ -8,6 +8,7 @@ from pathlib import Path, PurePosixPath
 import shutil
 import subprocess
 import sys
+import tarfile
 import traceback
 import zipfile
 
@@ -79,6 +80,16 @@ def adapted(relative, dest, changes=()):
         assert before in source, "ADAPTER_INPUT_NOT_FOUND:" + relative
         source = source.replace(before, after)
     dest.write_text(source, encoding='utf-8', newline='\n')
+
+def reuse_subject(input_var):
+    return f"""const reuseSubject=read(path.join(source,'contracts/frontend-subject-runtime-v1.json')).asset;
+    const sourceSubject=C.plain({input_var},reuseSubject.path.replace(/^public\\//,'dist/'));
+    const targetSubject=path.join(source,...reuseSubject.path.split('/'));
+    assert.equal(fs.statSync(sourceSubject).size,reuseSubject.sizeBytes);
+    assert.equal(C.sha(fs.readFileSync(sourceSubject)),reuseSubject.sha256);
+    fs.mkdirSync(path.dirname(targetSubject),{{recursive:true}});
+    fs.copyFileSync(sourceSubject,targetSubject);
+    """
 
 def main():
     assert os.environ.get('GITHUB_ACTIONS') == 'true'
@@ -203,8 +214,9 @@ def main():
 
         branch = ('refs/heads/verify-optimization20', BRANCH)
         old_version = ('1.0.21-preview.23', VERSION)
-        for name in ('contracts.cjs','bootstrap.cjs','provision-subject-model.cjs','verify-mac-entry.cjs','cloud-shortcut-launch.mjs'):
+        for name in ('contracts.cjs','bootstrap.cjs','provision-subject-model.cjs','verify-mac-entry.cjs'):
             adapted('native23/'+name, controls/name)
+        adapted('native23/cloud-shortcut-launch.mjs',controls/'cloud-shortcut-launch.mjs',[branch])
         for name in ('pkg_contract_adapter.py','contracts.cjs','bootstrap.cjs'):
             if (inputs/name).is_file():
                 shutil.copyfile(inputs/name, controls/name)
@@ -223,10 +235,21 @@ def main():
         budget('before-build')
         build = WORK/'build'
         if WIN:
+            zip_tool = WORK/'7zip-win-x64.tar.gz'
+            run('prefetch-exact-approved-7zip',['node',HERE/'prefetch-win-tools.cjs',zip_tool])
+            with tarfile.open(zip_tool,'r:gz') as archive:
+                members = [m for m in archive.getmembers() if m.isfile() and PurePosixPath(m.name).name == '7za.exe']
+                assert len(members) == 1 and members[0].size == 849920
+                seven = controls/'7za.exe'
+                with archive.extractfile(members[0]) as item, seven.open('xb') as out:
+                    shutil.copyfileobj(item,out)
+            assert sha(seven) == '223b873c50380fe9a39f1a22b6abf8d46db506e1c08d08312902f6f3cd1f7ac3'
+            clean['ELECTRON_BUILDER_7ZIP_PATH'] = str(seven)
             adapted('native23/build-windows.cjs',controls/'build-windows.cjs',[
                 branch, old_version, ('1.0.21-preview.21','1.0.21-preview.23'),
                 (scope['before'],scope['after']), ('length===945','length==='+str(scope['files'])),
                 ('806457221',str(base_info['plainBytes'])),
+                ("command('provision-offline-subject-model'",reuse_subject('input')+"command('provision-offline-subject-model'"),
                 ('9dc4195d811683ae66c8b3ca452b16e5d47b0b3c045eda339bc01817e0096a3a',base_info['plainSha256'])])
             run('native-build-windows',['node',controls/'build-windows.cjs','--source',source,'--base',base,
                 '--inputs',inputs,'--work',build],source,1800)
@@ -247,6 +270,8 @@ def main():
         else:
             adapted('native23/rebuild-mac-asar.cjs',controls/'rebuild-mac-asar.cjs',[
                 old_version, ('1.0.21-preview.22','1.0.21-preview.23'),(scope['before'],scope['after']),
+                ("execFileSync(process.execPath,[path.join(__dirname,'provision-subject-model.cjs')",reuse_subject('staged')+
+                 "execFileSync(process.execPath,[path.join(__dirname,'provision-subject-model.cjs')"),
                 ('length===946','length==='+str(scope['files'])),('sourceFiles:946','sourceFiles:'+str(scope['files']))])
             adapted('native23/build-mac.py',controls/'build-mac.py',[
                 branch, old_version, ("'1.0.21.23'","'1.0.21.24'"),(scope['before'],scope['after']),
@@ -295,6 +320,11 @@ def main():
         result['status'] = 'FAIL'
         (evidence/'ERROR.txt').write_text(traceback.format_exc(),encoding='utf-8')
     finally:
+        build_reports = WORK/'build/reports'
+        if build_reports.is_dir():
+            for report in build_reports.iterdir():
+                if report.is_file() and report.suffix in ('.log','.json') and report.stat().st_size < 2*1024**2:
+                    shutil.copyfile(report,evidence/('builder-'+report.name))
         save(evidence/'SUMMARY.json',result)
         reports = WORK/'reports.zip'
         with zipfile.ZipFile(reports,'x',compression=zipfile.ZIP_DEFLATED) as z:
