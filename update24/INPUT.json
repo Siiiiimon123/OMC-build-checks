@@ -1,0 +1,16 @@
+{
+  "version": "1.0.21-preview.24",
+  "scopes": {
+    "windows": {
+      "before": "8193729f927e6f292c6fe2eb383bec2f16a0a92f",
+      "after": "36d8034478abcdabeabe70a6b4783d1badc7e89b",
+      "files": 948
+    },
+    "mac": {
+      "before": "be3c2093a1bc62ea5755f8ed49326186be980e5e",
+      "after": "b1b7dfff5e66be3ff70dd410d57a40874f172557",
+      "files": 949
+    }
+  },
+  "sourceInputDirectory": "probability23"
+}
