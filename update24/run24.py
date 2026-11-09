@@ -18,7 +18,8 @@ WORK = Path(os.environ["RUNNER_TEMP"]).resolve() / "omc-update24"
 WIN = sys.platform == "win32"
 MODE = "windows" if WIN else "mac"
 VERSION = "1.0.21-preview.24"
-BRANCH = "refs/heads/verify-update24"
+BRANCH = os.environ.get("GITHUB_REF")
+MAC_LAYOUT = BRANCH == "refs/heads/verify-update24-mac-layout"
 BUDGET = 5 * 1024**3
 KEY = "OMC_PREVIEW15_TRANSPORT_KEY"
 
@@ -94,7 +95,9 @@ def reuse_subject(input_var):
 def main():
     assert os.environ.get('GITHUB_ACTIONS') == 'true'
     assert os.environ.get('GITHUB_REPOSITORY') == 'Siiiiimon123/OMC-build-checks'
-    assert os.environ.get('GITHUB_REF') == BRANCH and os.environ.get('GITHUB_RUN_ATTEMPT') == '1'
+    allowed_branches = ('refs/heads/verify-update24','refs/heads/verify-update24-win-tools') if WIN else (
+        'refs/heads/verify-update24','refs/heads/verify-update24-mac-layout')
+    assert BRANCH in allowed_branches and os.environ.get('GITHUB_RUN_ATTEMPT') == '1'
     assert WIN or sys.platform == 'darwin'
     WORK.mkdir()
     evidence = WORK / 'evidence'; evidence.mkdir()
@@ -210,9 +213,10 @@ def main():
 
         npm = 'npm.cmd' if WIN else 'npm'
         run('locked-build-dependencies',[npm,'ci','--ignore-scripts','--no-audit','--no-fund'],source)
-        run('update-source-regressions',['node','--test','electron/strictTufFetcher.test.cjs','electron/updateArtifactTransfer.test.cjs',
-            'electron/updateService.test.cjs','src/services/updateUiState.test.js','src/services/updateTrustContract.test.js'],source)
-        run('core-regressions',[npm,'run','test:core'],source)
+        if not MAC_LAYOUT:
+            run('update-source-regressions',['node','--test','electron/strictTufFetcher.test.cjs','electron/updateArtifactTransfer.test.cjs',
+                'electron/updateService.test.cjs','src/services/updateUiState.test.js','src/services/updateTrustContract.test.js'],source)
+            run('core-regressions',[npm,'run','test:core'],source)
 
         branch = ('refs/heads/verify-optimization20', BRANCH)
         old_version = ('1.0.21-preview.23', VERSION)
@@ -237,8 +241,9 @@ def main():
         budget('before-build')
         build = WORK/'build'
         if WIN:
-            zip_tool = WORK/'7zip-win-x64.tar.gz'
-            run('prefetch-exact-approved-7zip',['node',HERE/'prefetch-win-tools.cjs',zip_tool])
+            tool_dir = WORK/'tool-archives'; tool_dir.mkdir()
+            run('prefetch-exact-windows-tools',['node',HERE/'prefetch-win-tools.cjs',tool_dir])
+            zip_tool = tool_dir/'7zip-win-x64.tar.gz'
             with tarfile.open(zip_tool,'r:gz') as archive:
                 members = [m for m in archive.getmembers() if m.isfile() and PurePosixPath(m.name).name == '7za.exe']
                 assert len(members) == 1 and members[0].size == 849920
@@ -247,6 +252,14 @@ def main():
                     shutil.copyfileobj(item,out)
             assert sha(seven) == '223b873c50380fe9a39f1a22b6abf8d46db506e1c08d08312902f6f3cd1f7ac3'
             clean['ELECTRON_BUILDER_7ZIP_PATH'] = str(seven)
+            for prefix, env_name, check in [
+                ('nsis-3.0.4.1','ELECTRON_BUILDER_NSIS_DIR','Bin/makensis.exe'),
+                ('nsis-resources-3.4.1','ELECTRON_BUILDER_NSIS_RESOURCES_DIR','plugins')]:
+                dest = controls / prefix
+                dest.mkdir()
+                run('extract-'+prefix,[seven,'x','-t7z','-y','-bd','-bb0','-o'+str(dest),tool_dir/(prefix+'.7z')])
+                assert (dest/check).exists(), 'LOCKED_TOOL_LAYOUT:'+prefix
+                clean[env_name] = str(dest)
             adapted('native23/build-windows.cjs',controls/'build-windows.cjs',[
                 branch, old_version, ('1.0.21-preview.21','1.0.21-preview.23'),
                 (scope['before'],scope['after']), ('length===945','length==='+str(scope['files'])),
@@ -257,18 +270,55 @@ def main():
                 '--inputs',inputs,'--work',build],source,1800)
             receipt = read(build/'reports/PACKAGE_INPUTS.json')
             package = Path(receipt['current']['path'])
+            assert package.stat().st_size == receipt['current']['bytes']
+            result.update(builtInstallerBytes=package.stat().st_size,builtInstallerSha256=receipt['current']['sha256'])
             for name in ('fullApp','asar-input'):
                 owned_remove(build/name)
             (build/'new-app.asar').unlink()
             shutil.copyfile(build/'reports/FINAL_APP_MEMBERS.json',inputs/'FINAL_APP_MEMBERS.json')
             shutil.copyfile(build/'reports/PACKAGE_INPUTS.json',inputs/'PACKAGE_INPUTS.json')
+            install_script = inputs/'Install-CurrentWindows24.ps1'
+            old_script = (inputs/'Install-FinalWindows.ps1').read_text(encoding='utf-8-sig')
+            assert old_script.count(branch[0]) == 1
+            install_script.write_text(old_script.replace(*branch),encoding='utf-8-sig',newline='\r\n')
             run('native-first-install-windows',['powershell.exe','-NoProfile','-ExecutionPolicy','Bypass','-File',
-                inputs/'Install-FinalWindows.ps1','-InputsPath',inputs/'PACKAGE_INPUTS.json','-OutputPath',evidence/'FIRST_INSTALL.json'])
+                install_script,'-InputsPath',inputs/'PACKAGE_INPUTS.json','-OutputPath',evidence/'FIRST_INSTALL.json'])
             info = read(evidence/'FIRST_INSTALL.json')
             assert info['installedPayloadPassed'] and info['shortcutBindingPassed']
             installed = Path(info['executable']).parent
             installed_asar = installed/'resources/app.asar'
             run('windows-desktop-shortcut',['node',controls/'cloud-shortcut-launch.mjs',evidence/'FIRST_INSTALL.json',WORK/'shortcut',evidence],source)
+        elif MAC_LAYOUT:
+            stock_controls=controls/'stock-fetch';stock_controls.mkdir()
+            shutil.copyfile(HERE/'MAC_STOCK24.json',stock_controls/'BASE20_ARTIFACTS.json')
+            adapted('native23/fetch-base.mjs',stock_controls/'fetch-base.mjs',[branch])
+            stock_zip = WORK/'stock24.zip'
+            run('fetch-accepted-native24',['node',stock_controls/'fetch-base.mjs','mac',stock_zip],
+                timeout=600,env={**clean,'GH_TOKEN':os.environ['GH_TOKEN']})
+            stock_frozen = WORK/'stock24-frozen'
+            unzip(stock_zip,stock_frozen,1100*1024**2)
+            assert {p.name for p in stock_frozen.iterdir()} == {'PACKAGE_READY.json','package.enc'}
+            stock = WORK/'stock24.pkg'
+            run('decrypt-accepted-native24',['node',transport,'decrypt','--manifest',stock_frozen/'PACKAGE_READY.json','--id','pkg',
+                '--input',stock_frozen/'package.enc','--output',stock],env={**clean,KEY:os.environ[KEY]})
+            stock_info = read(HERE/'MAC_STOCK24.json')['mac']
+            assert stock.stat().st_size == stock_info['plainBytes'] and sha(stock) == stock_info['plainSha256']
+            stock_zip.unlink();owned_remove(stock_frozen)
+            budget('before-split-native-packaging')
+            run('mac-native-component-packages',['python',HERE/'mac-split24.py',base,stock,build,evidence/'MAC_SPLIT.json'],
+                source,1800)
+            split = read(evidence/'MAC_SPLIT.json')
+            assert split['status']=='PASS_MAC_NATIVE_SPLIT_PACKAGE_FIRST_INSTALL' and split['sameInstalledPayload']
+            base = Path(split['packages']['bootstrap']['path'])
+            package = Path(split['packages']['candidate']['path'])
+            installed = Path('/Applications/OMC-Preview.app')
+            installed_asar = installed/'Contents/Resources/app.asar'
+            run('mac-native-entry',['node',controls/'verify-mac-entry.cjs',source,installed,
+                split['originals']['candidate']['asarSha256'],evidence/'MAC_APP_ENTRY.json'],source)
+            adapted('isolated23/normal-cdp.mjs',controls/'normal-cdp.mjs')
+            shutil.copyfile(HERE/'verify-mac24.mjs',controls/'verify-mac24.mjs')
+            run('mac-installed-ui',['node',controls/'verify-mac24.mjs',installed,WORK/'mac-profile',evidence/'MAC_LAUNCH.json'],source)
+            result['testBase'] = 'PREVIEW23_APP_REPACKAGED_AS_TWO_COMPONENT_BOOTSTRAP'
         else:
             adapted('native23/rebuild-mac-asar.cjs',controls/'rebuild-mac-asar.cjs',[
                 old_version, ('1.0.21-preview.22','1.0.21-preview.23'),(scope['before'],scope['after']),
@@ -336,7 +386,7 @@ def main():
         private = {**clean,KEY:os.environ[KEY]}
         run('encrypt-report',['node',transport,'encrypt','--input',reports,'--output',encrypted/'reports.enc',
             '--manifest',encrypted/'REPORTS_READY.json','--id','reports'],env=private)
-        if result['nativeInstallation'] and package and package.is_file():
+        if package and package.is_file():
             if (WORK/'tls-fixture').is_dir():
                 owned_remove(WORK/'tls-fixture')
             budget('before-encrypted-candidate',package.stat().st_size)
