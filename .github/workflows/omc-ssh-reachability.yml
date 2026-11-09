@@ -1,0 +1,37 @@
+name: OMC SSH reachability only
+'on':
+  push:
+    branches: ['verify-omc-ssh']
+    paths: ['.github/workflows/omc-ssh-reachability.yml']
+permissions: {}
+jobs:
+  same-endpoint:
+    if: github.repository == 'Siiiiimon123/OMC-build-checks' && github.event.repository.private == false && github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Compare public HTTPS and pre-auth SSH
+        run: |
+          python3 - <<'PY'
+          import hashlib, http.client, json, socket
+          host = 'omc.xiaoa.cyou'
+          address = socket.getaddrinfo(host,22,socket.AF_INET,socket.SOCK_STREAM)[0][4][0]
+          report = {'peerIpv4Sha256':hashlib.sha256(address.encode()).hexdigest()}
+          try:
+              with socket.create_connection((address,22),timeout=7) as connection:
+                  connection.settimeout(7)
+                  connection.sendall(b'SSH-2.0-OMCReachabilityProbe\r\n')
+                  data = connection.recv(256)
+                  report['ssh'] = 'banner-received' if data.startswith(b'SSH-') else ('peer-closed-before-banner' if not data else 'non-ssh-response')
+          except OSError as error:
+              report['ssh'] = type(error).__name__
+          try:
+              connection = http.client.HTTPSConnection(host,timeout=7)
+              connection.request('HEAD','/updates/metadata/timestamp.json')
+              response = connection.getresponse()
+              report['https'] = response.status
+              connection.close()
+          except OSError as error:
+              report['https'] = type(error).__name__
+          print(json.dumps(report),flush=True)
+          PY
