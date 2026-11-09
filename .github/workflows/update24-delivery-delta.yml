@@ -1,0 +1,33 @@
+name: Exact Windows Preview24 delivery from its known baseline
+'on':
+  push:
+    branches: ['verify-update24-delivery-delta']
+    paths: ['update24/delivery-delta24.py', '.github/workflows/update24-delivery-delta.yml']
+permissions: {contents: read, actions: read}
+jobs:
+  delivery-bytes:
+    if: github.repository == 'Siiiiimon123/OMC-build-checks' && github.event.repository.private == false && github.run_attempt == 1
+    runs-on: ubuntu-24.04
+    timeout-minutes: 14
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with: {persist-credentials: false, fetch-depth: 1}
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with: {node-version: '24.19.0', architecture: x64, check-latest: false, package-manager-cache: false}
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with: {python-version: '3.12.10', architecture: x64, check-latest: false}
+      - name: Generate authenticated missing bytes from the accepted executables
+        env:
+          OMC_PREVIEW15_TRANSPORT_KEY: '${{ secrets.OMC_PREVIEW15_TRANSPORT_KEY }}'
+          GH_TOKEN: '${{ github.token }}'
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: python update24/delivery-delta24.py
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: delivery24-windows-authenticated-delta
+          path: |
+            ${{ runner.temp }}/omc-update24/delta/patch.enc
+            ${{ runner.temp }}/omc-update24/delta/PATCH_READY.json
+          compression-level: 0
+          retention-days: 7
+          if-no-files-found: error
