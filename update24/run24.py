@@ -267,13 +267,19 @@ def main():
                 '--inputs',inputs,'--work',build],source,1800)
             receipt = read(build/'reports/PACKAGE_INPUTS.json')
             package = Path(receipt['current']['path'])
+            assert package.stat().st_size == receipt['current']['bytes']
+            result.update(builtInstallerBytes=package.stat().st_size,builtInstallerSha256=receipt['current']['sha256'])
             for name in ('fullApp','asar-input'):
                 owned_remove(build/name)
             (build/'new-app.asar').unlink()
             shutil.copyfile(build/'reports/FINAL_APP_MEMBERS.json',inputs/'FINAL_APP_MEMBERS.json')
             shutil.copyfile(build/'reports/PACKAGE_INPUTS.json',inputs/'PACKAGE_INPUTS.json')
+            install_script = inputs/'Install-CurrentWindows24.ps1'
+            old_script = (inputs/'Install-FinalWindows.ps1').read_text(encoding='utf-8-sig')
+            assert old_script.count(branch[0]) == 1
+            install_script.write_text(old_script.replace(*branch),encoding='utf-8-sig',newline='\r\n')
             run('native-first-install-windows',['powershell.exe','-NoProfile','-ExecutionPolicy','Bypass','-File',
-                inputs/'Install-FinalWindows.ps1','-InputsPath',inputs/'PACKAGE_INPUTS.json','-OutputPath',evidence/'FIRST_INSTALL.json'])
+                install_script,'-InputsPath',inputs/'PACKAGE_INPUTS.json','-OutputPath',evidence/'FIRST_INSTALL.json'])
             info = read(evidence/'FIRST_INSTALL.json')
             assert info['installedPayloadPassed'] and info['shortcutBindingPassed']
             installed = Path(info['executable']).parent
@@ -346,7 +352,7 @@ def main():
         private = {**clean,KEY:os.environ[KEY]}
         run('encrypt-report',['node',transport,'encrypt','--input',reports,'--output',encrypted/'reports.enc',
             '--manifest',encrypted/'REPORTS_READY.json','--id','reports'],env=private)
-        if result['nativeInstallation'] and package and package.is_file():
+        if package and package.is_file():
             if (WORK/'tls-fixture').is_dir():
                 owned_remove(WORK/'tls-fixture')
             budget('before-encrypted-candidate',package.stat().st_size)
