@@ -26,6 +26,7 @@ async function main() {
     return { member, sha256: sha(bytes) };
   });
   assert.equal(JSON.parse(asar.extractFile(appAsar, 'package.json')).version, '1.0.21-preview.24');
+  assert.equal(JSON.parse(asar.extractFile(appAsar, path.join('dist','release-metadata.json'))).version, '1.0.21-preview.24');
   const { canonicalize } = req('@tufjs/canonical-json');
   const { UpdateService, hashedArtifactFileName } = req('./electron/updateService.cjs');
   const { planUpdateBlockReuse } = req('./scripts/planUpdateBlockReuse.cjs');

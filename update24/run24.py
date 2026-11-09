@@ -190,7 +190,7 @@ def main():
         with gzip.open(WORK/'overlay24.gz','rb') as z:
             overlay = json.loads(z.read(768*1024))
         rows = overlay['changesByPlatform'][MODE]
-        assert len(rows) == 10 and len({r['path'] for r in rows}) == 10
+        assert len(rows) == 11 and len({r['path'] for r in rows}) == 11
         for row in rows:
             name = row['path']
             p = source / native_path(name)
@@ -200,6 +200,8 @@ def main():
             p.write_bytes(b)
             by[name] = {k:v for k,v in row.items() if k != 'beforeSha256'}
         assert len(by) == scope['files'] and read(source/'package.json')['version'] == VERSION
+        lock = read(source/'package-lock.json')
+        assert lock['version'] == lock['packages']['']['version'] == read(source/'public/release-metadata.json')['version'] == VERSION
         save(inputs/'source19-records.json',{'sourceTree':scope['after'],'records':list(by.values())})
         origin = read(inputs/('runtime-origin-source.json' if WIN else 'MAC_BACKEND_SOURCE_RECORDS.json'))
         ai = lambda records: {r['path']:r['sha256'] for r in records if r['path'].startswith('ai-training/')}
