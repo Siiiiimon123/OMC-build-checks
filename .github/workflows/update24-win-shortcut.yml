@@ -1,0 +1,33 @@
+name: Preview24 exact Windows desktop launch
+'on':
+  push:
+    branches: ['verify-update24-win-shortcut']
+    paths: ['update24/win-shortcut24.py', '.github/workflows/update24-win-shortcut.yml']
+permissions: {contents: read, actions: read}
+jobs:
+  actual-desktop-launch:
+    if: github.repository == 'Siiiiimon123/OMC-build-checks' && github.event.repository.private == false && github.run_attempt == 1
+    runs-on: windows-2025
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with: {persist-credentials: false, fetch-depth: 1}
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with: {node-version: '24.19.0', architecture: x64, check-latest: false, package-manager-cache: false}
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with: {python-version: '3.12.10', architecture: x64, check-latest: false, package-manager-cache: false}
+      - name: Verify previous transfer evidence and open the original installed desktop link
+        env:
+          OMC_PREVIEW15_TRANSPORT_KEY: '${{ secrets.OMC_PREVIEW15_TRANSPORT_KEY }}'
+          GH_TOKEN: '${{ github.token }}'
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: python update24/win-shortcut24.py
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        if: always()
+        with:
+          name: update24-windows-shortcut-encrypted-evidence
+          path: |
+            ${{ runner.temp }}/omc-update24/encrypted/reports.enc
+            ${{ runner.temp }}/omc-update24/encrypted/REPORTS_READY.json
+          retention-days: 7
+          if-no-files-found: warn
