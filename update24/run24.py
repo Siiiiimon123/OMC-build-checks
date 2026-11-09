@@ -19,6 +19,8 @@ WIN = sys.platform == "win32"
 MODE = "windows" if WIN else "mac"
 VERSION = "1.0.21-preview.24"
 BRANCH = os.environ.get("GITHUB_REF")
+MAC_LAYOUT = BRANCH == "refs/heads/verify-update24-mac-layout"
+WIN_ACCEPT = BRANCH == "refs/heads/verify-update24-win-accept"
 BUDGET = 5 * 1024**3
 KEY = "OMC_PREVIEW15_TRANSPORT_KEY"
 
@@ -94,7 +96,9 @@ def reuse_subject(input_var):
 def main():
     assert os.environ.get('GITHUB_ACTIONS') == 'true'
     assert os.environ.get('GITHUB_REPOSITORY') == 'Siiiiimon123/OMC-build-checks'
-    allowed_branches = ('refs/heads/verify-update24','refs/heads/verify-update24-win-tools') if WIN else ('refs/heads/verify-update24',)
+    allowed_branches = ('refs/heads/verify-update24','refs/heads/verify-update24-win-tools',
+        'refs/heads/verify-update24-win-accept') if WIN else (
+        'refs/heads/verify-update24','refs/heads/verify-update24-mac-layout')
     assert BRANCH in allowed_branches and os.environ.get('GITHUB_RUN_ATTEMPT') == '1'
     assert WIN or sys.platform == 'darwin'
     WORK.mkdir()
@@ -211,9 +215,10 @@ def main():
 
         npm = 'npm.cmd' if WIN else 'npm'
         run('locked-build-dependencies',[npm,'ci','--ignore-scripts','--no-audit','--no-fund'],source)
-        run('update-source-regressions',['node','--test','electron/strictTufFetcher.test.cjs','electron/updateArtifactTransfer.test.cjs',
-            'electron/updateService.test.cjs','src/services/updateUiState.test.js','src/services/updateTrustContract.test.js'],source)
-        run('core-regressions',[npm,'run','test:core'],source)
+        if not (MAC_LAYOUT or WIN_ACCEPT):
+            run('update-source-regressions',['node','--test','electron/strictTufFetcher.test.cjs','electron/updateArtifactTransfer.test.cjs',
+                'electron/updateService.test.cjs','src/services/updateUiState.test.js','src/services/updateTrustContract.test.js'],source)
+            run('core-regressions',[npm,'run','test:core'],source)
 
         branch = ('refs/heads/verify-optimization20', BRANCH)
         old_version = ('1.0.21-preview.23', VERSION)
@@ -237,7 +242,67 @@ def main():
         artifact.unlink(); owned_remove(frozen)
         budget('before-build')
         build = WORK/'build'
-        if WIN:
+        if WIN_ACCEPT:
+            assets = read(HERE/'WIN_EXISTING24.json')
+            def read_asset(label, key, folder, expected_members, limit):
+                transport_folder = controls/('fetch-'+label); transport_folder.mkdir()
+                save(transport_folder/'BASE20_ARTIFACTS.json',{'windows':assets[key]})
+                adapted('native23/fetch-base.mjs',transport_folder/'fetch-base.mjs',[branch])
+                archive = WORK/(label+'.zip')
+                run('fetch-'+label,['node',transport_folder/'fetch-base.mjs','windows',archive],timeout=600,
+                    env={**clean,'GH_TOKEN':os.environ['GH_TOKEN']})
+                unzip(archive,folder,limit)
+                assert {p.name for p in folder.iterdir()} == set(expected_members)
+                archive.unlink()
+            from_r4 = WORK/'windows-r4-frozen'
+            read_asset('exact-existing-windows24','installer',from_r4,['PACKAGE_READY.json','package.enc'],1100*1024**2)
+            package = WORK/'OMC-Preview-1.0.21-preview.24-x64.exe'
+            run('decrypt-existing-windows24',['node',transport,'decrypt','--manifest',from_r4/'PACKAGE_READY.json',
+                '--id','pkg','--input',from_r4/'package.enc','--output',package],env={**clean,KEY:os.environ[KEY]})
+            assert package.stat().st_size==assets['installer']['plainBytes'] and sha(package)==assets['installer']['plainSha256']
+            owned_remove(from_r4)
+            frozen_proof = WORK/'win24-proof'
+            read_asset('exact-existing-windows24-proof','evidence',frozen_proof,['REPORTS_READY.json','reports.enc'],8*1024**2)
+            run('decrypt-existing-windows24-proof',['node',transport,'decrypt','--manifest',frozen_proof/'REPORTS_READY.json',
+                '--id','reports','--input',frozen_proof/'reports.enc','--output',WORK/'win24-proof.zip'],
+                env={**clean,KEY:os.environ[KEY]})
+            proof = WORK/'win24-proof-read'
+            unzip(WORK/'win24-proof.zip',proof,16*1024**2)
+            auth = read(proof/'SUMMARY.json')
+            assert auth['sourceTree']==scope['after'] and auth['controlCommit']=='6d5f3540d0e27e57c89423536bb3bf0cc774e528'
+            receipt = read(proof/'builder-PACKAGE_INPUTS.json')
+            assert receipt['current']['sha256']==assets['installer']['plainSha256'] and receipt['current']['version']==VERSION
+            receipt['current']['path'] = str(package)
+            shutil.copyfile(proof/'builder-FINAL_APP_MEMBERS.json',inputs/'FINAL_APP_MEMBERS.json')
+            save(inputs/'PACKAGE_INPUTS.json',receipt)
+            install_script = inputs/'Install-CurrentWindows24.ps1'
+            old_script = (inputs/'Install-FinalWindows.ps1').read_text(encoding='utf-8-sig')
+            assert old_script.count(branch[0]) == 1
+            install_script.write_text(old_script.replace(*branch),encoding='utf-8-sig',newline='\r\n')
+            run('native-first-install-windows',['powershell.exe','-NoProfile','-ExecutionPolicy','Bypass','-File',
+                install_script,'-InputsPath',inputs/'PACKAGE_INPUTS.json','-OutputPath',evidence/'FIRST_INSTALL.json'])
+            info = read(evidence/'FIRST_INSTALL.json')
+            assert info['installedPayloadPassed']
+            installed = Path(info['executable']).parent
+            installed_asar = installed/'resources/app.asar'
+            run('observe-real-desktop-shortcuts',['powershell.exe','-NoProfile','-ExecutionPolicy','Bypass','-File',
+                HERE/'windows-desktop-diagnostic.ps1','-Executable',info['executable'],'-OutputPath',evidence/'SHORTCUT_DIAGNOSTIC.json'])
+            diagnostic = read(evidence/'SHORTCUT_DIAGNOSTIC.json')
+            result['shortcutBindingPassed'] = bool(info['shortcutBindingPassed'] or diagnostic['validDesktopShortcut'])
+            if result['shortcutBindingPassed']:
+                if not info['shortcutBindingPassed']:
+                    verified_link = next(x for x in diagnostic['matches'] if x['iconMatches'])
+                    info.update(shortcut=verified_link['path'],iconLocation=verified_link['icon'],
+                        matchingShortcuts=1,shortcutBindingPassed=True,
+                        status='PASS_FIRST_INSTALL_CANONICAL_REGISTRATION_AND_SHORTCUT_BINDING')
+                    save(evidence/'FIRST_INSTALL_QUALIFIED_DESKTOP.json',info)
+                qualified = evidence/('FIRST_INSTALL_QUALIFIED_DESKTOP.json' if (evidence/'FIRST_INSTALL_QUALIFIED_DESKTOP.json').is_file()
+                    else 'FIRST_INSTALL.json')
+                run('windows-desktop-shortcut',['node',controls/'cloud-shortcut-launch.mjs',qualified,WORK/'shortcut',evidence],source)
+            else:
+                run('windows-native-registered-exe',['node',HERE/'verify-win24.mjs',info['executable'],
+                    WORK/'win-profile',evidence/'WINDOWS_LAUNCH.json'],source)
+        elif WIN:
             tool_dir = WORK/'tool-archives'; tool_dir.mkdir()
             run('prefetch-exact-windows-tools',['node',HERE/'prefetch-win-tools.cjs',tool_dir])
             zip_tool = tool_dir/'7zip-win-x64.tar.gz'
@@ -285,6 +350,37 @@ def main():
             installed = Path(info['executable']).parent
             installed_asar = installed/'resources/app.asar'
             run('windows-desktop-shortcut',['node',controls/'cloud-shortcut-launch.mjs',evidence/'FIRST_INSTALL.json',WORK/'shortcut',evidence],source)
+        elif MAC_LAYOUT:
+            stock_controls=controls/'stock-fetch';stock_controls.mkdir()
+            shutil.copyfile(HERE/'MAC_STOCK24.json',stock_controls/'BASE20_ARTIFACTS.json')
+            adapted('native23/fetch-base.mjs',stock_controls/'fetch-base.mjs',[branch])
+            stock_zip = WORK/'stock24.zip'
+            run('fetch-accepted-native24',['node',stock_controls/'fetch-base.mjs','mac',stock_zip],
+                timeout=600,env={**clean,'GH_TOKEN':os.environ['GH_TOKEN']})
+            stock_frozen = WORK/'stock24-frozen'
+            unzip(stock_zip,stock_frozen,1100*1024**2)
+            assert {p.name for p in stock_frozen.iterdir()} == {'PACKAGE_READY.json','package.enc'}
+            stock = WORK/'stock24.pkg'
+            run('decrypt-accepted-native24',['node',transport,'decrypt','--manifest',stock_frozen/'PACKAGE_READY.json','--id','pkg',
+                '--input',stock_frozen/'package.enc','--output',stock],env={**clean,KEY:os.environ[KEY]})
+            stock_info = read(HERE/'MAC_STOCK24.json')['mac']
+            assert stock.stat().st_size == stock_info['plainBytes'] and sha(stock) == stock_info['plainSha256']
+            stock_zip.unlink();owned_remove(stock_frozen)
+            budget('before-split-native-packaging')
+            run('mac-native-component-packages',['python',HERE/'mac-split24.py',base,stock,build,evidence/'MAC_SPLIT.json'],
+                source,1800)
+            split = read(evidence/'MAC_SPLIT.json')
+            assert split['status']=='PASS_MAC_NATIVE_SPLIT_PACKAGE_FIRST_INSTALL' and split['sameInstalledPayload']
+            base = Path(split['packages']['bootstrap']['path'])
+            package = Path(split['packages']['candidate']['path'])
+            installed = Path('/Applications/OMC-Preview.app')
+            installed_asar = installed/'Contents/Resources/app.asar'
+            run('mac-native-entry',['node',controls/'verify-mac-entry.cjs',source,installed,
+                split['originals']['candidate']['asarSha256'],evidence/'MAC_APP_ENTRY.json'],source)
+            adapted('isolated23/normal-cdp.mjs',controls/'normal-cdp.mjs')
+            shutil.copyfile(HERE/'verify-mac24.mjs',controls/'verify-mac24.mjs')
+            run('mac-installed-ui',['node',controls/'verify-mac24.mjs',installed,WORK/'mac-profile',evidence/'MAC_LAUNCH.json'],source)
+            result['testBase'] = 'PREVIEW23_APP_REPACKAGED_AS_TWO_COMPONENT_BOOTSTRAP'
         else:
             adapted('native23/rebuild-mac-asar.cjs',controls/'rebuild-mac-asar.cjs',[
                 old_version, ('1.0.21-preview.22','1.0.21-preview.23'),(scope['before'],scope['after']),
@@ -333,6 +429,9 @@ def main():
             result['transferExitCode'] = rc
             raise AssertionError('TRANSFER_GATE_FAILED')
         assert read(evidence/'TRANSFER.json')['passed']
+        result['transferPathsPassed'] = True
+        if WIN_ACCEPT:
+            assert result['shortcutBindingPassed'], 'DESKTOP_SHORTCUT_REQUIRED'
         result['status'] = 'PASS_NATIVE_PACKAGE_AND_ALL_TRANSFER_PATHS'
     except Exception:
         result['status'] = 'FAIL'

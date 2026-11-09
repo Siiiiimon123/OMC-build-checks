@@ -1,0 +1,14 @@
+{
+  "installer": {
+    "id": 13658963349,
+    "bytes": 806707930,
+    "sha256": "c5b5940c76462891364092f127b028e025a6550f7e52a2bda429a88952f09a1a",
+    "plainBytes": 806461267,
+    "plainSha256": "4ac3fcd07425bcb32a7356a1abbbdacf9385507711e096acd7830104e7c8079f"
+  },
+  "evidence": {
+    "id": 13658878686,
+    "bytes": 377614,
+    "sha256": "d95539da8a012943cdb916c193b0044de101e9d66d37a45721baa0f6b6f12917"
+  }
+}
