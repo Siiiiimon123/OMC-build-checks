@@ -35,7 +35,8 @@ def main():
     transport = controls / "transport.cjs"
     transport.write_bytes(raw("final19/transport.cjs"))
     assert sha(transport) == "19f37e9f504c90cd26dc7ca9da8606af9a13154e2a9ec6f0fdd20e026d4ff90f"
-    env = {k: v for k, v in os.environ.items() if k not in (KEY, "GH_TOKEN", "GITHUB_TOKEN")}
+    env = {k: v for k, v in os.environ.items()
+           if k not in (KEY, "GH_TOKEN", "GITHUB_TOKEN") and k.lower() != "psmodulepath"}
     private = {**env, KEY: os.environ[KEY]}
     assets = read(HERE / "WIN_EXISTING24.json")
     exact = assets["installer"]
