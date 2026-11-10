@@ -24,6 +24,7 @@ ASAR = {
 def download(url, destination, length, sha256):
     request = urllib.request.Request(url, headers={'Accept-Encoding': 'identity'})
     digest, read = hashlib.sha256(), 0
+    next_progress = 64 * 1024 * 1024
     with urllib.request.urlopen(request, timeout=60) as response, destination.open('xb') as out:
         if response.geturl() != url or response.status != 200:
             raise RuntimeError('Unexpected package route')
@@ -33,6 +34,9 @@ def download(url, destination, length, sha256):
                 raise RuntimeError('Package size exceeded')
             digest.update(block)
             out.write(block)
+            if read >= next_progress:
+                print(f'Package download: {read}/{length} bytes', flush=True)
+                next_progress += 64 * 1024 * 1024
     assert read == length and digest.hexdigest() == sha256
 
 def install(installer):
@@ -82,7 +86,7 @@ def main():
         assert hashlib.file_digest(handle,'sha256').hexdigest() == ASAR[sys.platform]
     installer.unlink()
     codec = jpeg_fixture_codec(work)
-    subprocess.run(['node',Path(__file__).with_suffix('.cjs'),executable,work,codec],check=True,timeout=1200)
+    subprocess.run(['node',Path(__file__).with_suffix('.cjs'),executable,work,codec],check=True,timeout=1500)
 
 if __name__ == '__main__':
     main()

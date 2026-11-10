@@ -199,11 +199,22 @@ async function stage(name,fn) {
       });
       assert.equal(injected,files.length);
       await until(()=>!document.querySelector('.import-dialog')&&Boolean(document.querySelector('.photo-tile')),360000);
-      const state=await snapshot();
-      assert.equal(state.photos.length,files.length);
-      assert.equal(state.projects.length,1);
-      assert.equal(state.projects[0].state,'complete');
-      return {photos:state.photos.length};
+      const initial=await snapshot();
+      const deadline=Date.now()+360000;
+      let state=initial;
+      while(Date.now()<deadline && child.exitCode===null) {
+        assert.equal(state.projects.length,1);
+        const project=state.projects[0];
+        if(project.state==='complete') {
+          assert.equal(state.photos.length,files.length);
+          assert.equal(project.count,files.length);
+          return {firstVisible:initial.photos.length,photos:state.photos.length};
+        }
+        assert.equal(project.state,'importing','Unexpected terminal import state');
+        await delay(350);
+        state=await snapshot();
+      }
+      throw Error('BATCH_IMPORT_TIMEOUT: '+state.photos.length+' of '+files.length);
     });
     await stage('batch-analysis',async()=>{
       const start=Date.now();
@@ -211,9 +222,9 @@ async function stage(name,fn) {
       do {
         state=await snapshot();
         const analyzed=state.photos.filter(p=>p.analysis==='full_ai').length;
-        if(analyzed===files.length && state.projects[0].analysis!=='running')
+        if(analyzed===files.length && state.projects[0].analysis==='completed')
           return {analyzed,groups:state.groups.length,automatic:state.photos.filter(p=>p.automatic).length};
-        if(['partial','failed','interrupted','cancelled'].includes(state.projects[0].analysis))
+        if(['partial','failed','interrupted','canceled'].includes(state.projects[0].analysis))
           throw Error('BATCH_ANALYSIS_INCOMPLETE: '+state.projects[0].analysis+' full='+analyzed);
         await delay(1200);
       } while(Date.now()-start<720000);
@@ -250,6 +261,7 @@ async function stage(name,fn) {
   } catch(error) {
     report.status='FAIL';
     report.error=String(error.stack??error).slice(0,4000);
+    console.error(report.error);
     process.exitCode=1;
   } finally {
     if(client) client.close();
