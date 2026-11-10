@@ -92,7 +92,8 @@ async function snapshot() {
         request.onerror = () => reject(request.error);
       });
       const [projects,photos,decisions,groups] = await Promise.all(['projects','photoAssets','decisions','groups'].map(read));
-      return {projects:projects.map(p=>({id:p.id,count:p.count,state:p.importState,analysis:p.analysisRunState})),
+      return {projects:projects.map(p=>({id:p.id,count:p.count,state:p.importState,analysis:p.analysisRunState,
+          generation:p.analysisGeneration,originalCheck:p.automaticReviewLastRun ?? null})),
         photos:photos.map(p=>({id:p.id,file:p.fileName,analysis:p.analysis?.analysisLevel,
           automatic:p.automaticReview?.kind,crop:p.crop??null,edit:p.jpegEdit??null})),
         decisions:decisions.map(d=>({photoId:d.photoId,decision:d.decision})),
@@ -222,13 +223,24 @@ async function stage(name,fn) {
       do {
         state=await snapshot();
         const analyzed=state.photos.filter(p=>p.analysis==='full_ai').length;
-        if(analyzed===files.length && state.projects[0].analysis==='completed')
-          return {analyzed,groups:state.groups.length,automatic:state.photos.filter(p=>p.automatic).length};
-        if(['partial','failed','interrupted','canceled'].includes(state.projects[0].analysis))
-          throw Error('BATCH_ANALYSIS_INCOMPLETE: '+state.projects[0].analysis+' full='+analyzed);
+        const project=state.projects[0];
+        const originalCheck=project.originalCheck;
+        if(analyzed===files.length && project.analysis==='completed' && originalCheck
+            && Number.isSafeInteger(project.generation) && originalCheck.generation===project.generation) {
+          assert.equal(originalCheck.totalCount,files.length);
+          assert.equal(originalCheck.failureCount,0,'Native original checks failed');
+          assert.equal(originalCheck.focusSkippedCount,0,'Native subject checks were skipped');
+          assert.equal(originalCheck.inspectedCount,originalCheck.candidateCount);
+          const automatic=state.photos.filter(p=>p.automatic).length;
+          assert.equal(originalCheck.classifiedCount,automatic);
+          return {analyzed,groups:state.groups.length,automatic,
+            originalCandidates:originalCheck.candidateCount,originalsInspected:originalCheck.inspectedCount};
+        }
+        if(['partial','failed','interrupted','canceled'].includes(project.analysis))
+          throw Error('BATCH_ANALYSIS_INCOMPLETE: '+project.analysis+' full='+analyzed);
         await delay(1200);
       } while(Date.now()-start<720000);
-      throw Error('BATCH_ANALYSIS_TIMEOUT: '+state.photos.filter(p=>p.analysis==='full_ai').length);
+      throw Error('BATCH_ANALYSIS_OR_ORIGINAL_CHECK_TIMEOUT: '+state.photos.filter(p=>p.analysis==='full_ai').length);
     });
     await stage('manual-review',async()=>{
       await click('单图','.view-switcher');

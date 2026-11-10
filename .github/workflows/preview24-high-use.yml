@@ -12,6 +12,7 @@ jobs:
       matrix:
         include:
           - {os: windows-2025, arch: x64}
+          - {os: macos-15, arch: arm64}
     runs-on: '${{ matrix.os }}'
     timeout-minutes: 75
     steps:
