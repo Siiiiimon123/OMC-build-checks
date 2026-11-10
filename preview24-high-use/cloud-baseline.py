@@ -1,11 +1,14 @@
 """Download and verify the existing Preview.24 in a disposable runner only."""
 import hashlib
+import http.client
 import os
 import platform
 import shutil
 import subprocess
 import sys
 import tarfile
+import time
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -22,21 +25,44 @@ ASAR = {
 }
 
 def download(url, destination, length, sha256):
-    request = urllib.request.Request(url, headers={'Accept-Encoding': 'identity'})
     digest, read = hashlib.sha256(), 0
     next_progress = 64 * 1024 * 1024
-    with urllib.request.urlopen(request, timeout=60) as response, destination.open('xb') as out:
-        if response.geturl() != url or response.status != 200:
-            raise RuntimeError('Unexpected package route')
-        for block in iter(lambda: response.read(1024 * 1024), b''):
-            read += len(block)
-            if read > length:
-                raise RuntimeError('Package size exceeded')
-            digest.update(block)
-            out.write(block)
-            if read >= next_progress:
-                print(f'Package download: {read}/{length} bytes', flush=True)
-                next_progress += 64 * 1024 * 1024
+    deadline = time.monotonic() + 45 * 60
+    failures = 0
+    with destination.open('xb') as out:
+        while read < length:
+            if time.monotonic() >= deadline:
+                raise RuntimeError('Package download deadline exceeded')
+            offset = read
+            headers = {'Accept-Encoding': 'identity'}
+            if offset:
+                headers['Range'] = f'bytes={offset}-'
+            request = urllib.request.Request(url, headers=headers)
+            try:
+                with urllib.request.urlopen(request, timeout=60) as response:
+                    if response.geturl() != url or response.status != (206 if offset else 200):
+                        raise RuntimeError('Unexpected package route or response status')
+                    if offset and response.headers.get('Content-Range') != f'bytes {offset}-{length-1}/{length}':
+                        raise RuntimeError('Package resume range does not match')
+                    for block in iter(lambda: response.read(1024 * 1024), b''):
+                        if time.monotonic() >= deadline or read + len(block) > length:
+                            raise RuntimeError('Package download exceeded its time or byte limit')
+                        read += len(block)
+                        digest.update(block)
+                        out.write(block)
+                        if read >= next_progress:
+                            print(f'Package download: {read}/{length} bytes', flush=True)
+                            next_progress += 64 * 1024 * 1024
+                    if read < length:
+                        raise ConnectionError('Package response ended before all expected bytes')
+            except (urllib.error.URLError, ConnectionError, TimeoutError, http.client.IncompleteRead) as error:
+                if isinstance(error, urllib.error.HTTPError) and error.code not in (408, 429, 500, 502, 503, 504):
+                    raise
+                failures += 1
+                if failures >= 5 or time.monotonic() >= deadline:
+                    raise
+                print(f'Package transfer retry {failures}/4 at byte {read}: {type(error).__name__}', flush=True)
+                time.sleep(2 ** failures)
     assert read == length and digest.hexdigest() == sha256
 
 def install(installer):
