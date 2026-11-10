@@ -1,0 +1,33 @@
+name: Preview24 isolated native workload baseline
+'on':
+  push:
+    branches: ['verify-preview24-high-use']
+    paths: ['preview24-high-use/**', '.github/workflows/preview24-high-use.yml']
+permissions: {contents: read}
+jobs:
+  native-baseline:
+    if: github.repository == 'Siiiiimon123/OMC-build-checks' && github.run_attempt == 1
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: windows-2025, arch: x64}
+          - {os: macos-15, arch: arm64}
+    runs-on: '${{ matrix.os }}'
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with: {persist-credentials: false, fetch-depth: 1}
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with: {node-version: '24.19.0', architecture: '${{ matrix.arch }}', check-latest: false, package-manager-cache: false}
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with: {python-version: '3.12.10', architecture: '${{ matrix.arch }}', check-latest: false}
+      - name: Install and use published Preview.24 in disposable profile
+        run: python preview24-high-use/cloud-baseline.py
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        if: always()
+        with:
+          name: 'preview24-high-use-${{ matrix.os }}'
+          path: '${{ runner.temp }}/omc-preview24-high-use/BASELINE.json'
+          retention-days: 7
+          if-no-files-found: warn
