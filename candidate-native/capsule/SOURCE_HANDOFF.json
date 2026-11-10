@@ -1,0 +1,25 @@
+{
+  "scope": "Verified local candidate source increment",
+  "baselineVersion": "1.0.21-preview.24",
+  "sourcePlanSha256": "432120cd83538779f67c78ec9eece62797b0c845a742b95e51a92c8cccfe145c",
+  "scopes": {
+    "windows": {
+      "before": "5603b78237c5d6bbfdccaaef3d326eca53283154",
+      "after": "9ca431cde8234255aa6acbc5a7da5a092c59db81",
+      "baselineFiles": 948,
+      "files": 949,
+      "changes": 45
+    },
+    "mac": {
+      "before": "c36552fa74dd8e1afd9996133405bd63e40510a4",
+      "after": "720354d611f6e1a6e62fbcb7d685ee814b29b441",
+      "baselineFiles": 949,
+      "files": 949,
+      "changes": 41
+    }
+  },
+  "compressedBytes": 405913,
+  "plaintextSha256": "680bf072d70514f231daf877b7c4b2bb25d65633be850145748db5eede96a29d",
+  "ciphertextSha256": "05d027475802ddf53805e0199b63085c4cfe2d390974c555be874d4757e119f8",
+  "roundTripPassed": true
+}

@@ -1,0 +1,14 @@
+{
+  "schema": "omc-aes256gcm-build-transport-v1",
+  "assets": [
+    {
+      "id": "candidate-source",
+      "plaintextBytes": 405913,
+      "plaintextSha256": "680bf072d70514f231daf877b7c4b2bb25d65633be850145748db5eede96a29d",
+      "ciphertextBytes": 405913,
+      "nonceHex": "db730af3bcf535410b9dbbd6",
+      "ciphertextSha256": "05d027475802ddf53805e0199b63085c4cfe2d390974c555be874d4757e119f8",
+      "tagHex": "fe8b9473994831d5249b50a8963f36a1"
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "testVersion": "1.0.21-preview.25",
+  "runnerRef": "refs/heads/verify-native-candidate",
+  "basePackages": {
+    "windows": {
+      "bytes": 806461267,
+      "sha256": "4ac3fcd07425bcb32a7356a1abbbdacf9385507711e096acd7830104e7c8079f",
+      "asarSha256": "880b57175b2c72dab99e48acbefb385e007c2918a041371df4c7b8ed8a58a373"
+    },
+    "mac": {
+      "bytes": 991719638,
+      "sha256": "c410173d2ec9088895e6d8d02c6a55785ae5c7e6a30f74ca585ffa05f3281b3b",
+      "asarSha256": "fef9b673eeca088459d13aeba79a7cec9647ccb2e1225786c3a4298775312a43"
+    }
+  },
+  "sourceTrees": {
+    "windows": "71adf0021ac9e20a408d83e094ad2deddda4995b",
+    "mac": "6d0e522c198abd0e8ee47d1d25f11d188b101789"
+  },
+  "controlSha256": {
+    "build-windows.cjs": "7a96b415594abb3536ed7c71d7b6d2c029d8fb429fb3e53328c8923944cddec0",
+    "build-mac.py": "67b3c7865d5f927e471151ca249c22a4e49a13ff002ae27d7daebf62603c7ca6",
+    "rebuild-mac-asar.cjs": "ec099f28b297ae260c039a165e29c18a410c777770c167c6ccc4d6d892acfa0a"
+  }
+}
