@@ -53,10 +53,10 @@ async function ev(fn, ...args) {
   return response.result.value;
 }
 
-async function until(fn, timeout=60000) {
+async function until(fn, timeout=60000, ...args) {
   const deadline = Date.now()+timeout;
   while (Date.now()<deadline && child.exitCode===null) {
-    const result = await ev(fn);
+    const result = await ev(fn, ...args);
     if (result) return result;
     await delay(180);
   }
@@ -64,15 +64,22 @@ async function until(fn, timeout=60000) {
 }
 
 async function click(label, scope='body') {
-  const rect = await ev((label, scope) => {
-    const button = [...document.querySelectorAll(scope+' button')].find(e =>
-      !e.disabled && e.offsetWidth && (e.getAttribute('aria-label')===label || e.innerText.trim()===label));
-    if (!button) return null;
-    button.scrollIntoView({block:'nearest'});
-    const r = button.getBoundingClientRect();
-    return {x:r.x+r.width/2,y:r.y+r.height/2};
-  },label,scope);
-  assert(rect,'VISIBLE_BUTTON_REQUIRED: '+label);
+  let rect;
+  try {
+    rect = await until((label, scope) => {
+      for (const button of document.querySelectorAll(scope+' button')) {
+        if (button.disabled || !button.offsetWidth ||
+            (button.getAttribute('aria-label')!==label && button.innerText.trim()!==label)) continue;
+        button.scrollIntoView({block:'nearest'});
+        const box = button.getBoundingClientRect();
+        const point = {x:box.x+box.width/2,y:box.y+box.height/2};
+        if (button.contains(document.elementFromPoint(point.x,point.y))) return point;
+      }
+      return null;
+    },15000,label,scope);
+  } catch (error) {
+    throw Error('INTERACTIVE_BUTTON_REQUIRED: '+label,{cause:error});
+  }
   await client.call('Input.dispatchMouseEvent',{type:'mousePressed',...rect,button:'left',buttons:1,clickCount:1});
   await client.call('Input.dispatchMouseEvent',{type:'mouseReleased',...rect,button:'left',buttons:0,clickCount:1});
 }
@@ -147,6 +154,7 @@ async function launch() {
       client=await connect(target.webSocketDebuggerUrl);
       await until(()=>document.querySelector('#root')?.childElementCount&&window.electronAPI?.platform);
       await client.call('Emulation.setDeviceMetricsOverride',{width:1280,height:800,deviceScaleFactor:1,mobile:false});
+      await until(()=>!document.querySelector('.startup-splash'));
       return;
     }
     await delay(180);
@@ -170,7 +178,17 @@ async function stage(name,fn) {
   report.checks.push({name,elapsedMs:Date.now()-started,detail:detail??null});
 }
 
-(async()=>{
+async function prepareWorkspace() {
+  const identityPrompt = await ev(()=>[...document.querySelectorAll('.model-panel-dialog button')]
+    .some(button=>button.innerText.trim()==='使用此编号开始选片'));
+  if (identityPrompt) await click('使用此编号开始选片','.model-panel-dialog');
+  const onboarding = await ev(()=>Boolean(document.querySelector('button[aria-label=跳过新手引导]')?.offsetWidth));
+  if (onboarding) await click('跳过新手引导');
+  return {identityPrompt,onboarding};
+}
+
+module.exports = {connect};
+if (require.main === module) (async()=>{
   assert.equal(process.env.GITHUB_ACTIONS,'true');
   assert.equal(process.env.GITHUB_REPOSITORY,'Siiiiimon123/OMC-build-checks');
   assert.equal(process.env.GITHUB_REF,'refs/heads/verify-preview24-high-use');
@@ -180,9 +198,7 @@ async function stage(name,fn) {
     const files=fixtures();
     await stage('native-start',async()=>{
       await launch();
-      const start=await ev(()=>[...document.querySelectorAll('button')].some(b=>b.innerText.trim()==='使用此编号开始选片'));
-      if(start) await click('使用此编号开始选片');
-      if(await ev(()=>Boolean(document.querySelector('button[aria-label=跳过新手引导]')?.offsetWidth))) await click('跳过新手引导');
+      return prepareWorkspace();
     });
     await stage('batch-import',async()=>{
       await click('导入照片');
